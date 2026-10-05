@@ -1,0 +1,262 @@
+// ============================================
+// DUMMY DATA - Easy to replace with API calls
+// ============================================
+
+export const statsData = [
+  {
+    id: 'users',
+    label: 'Total Users',
+    value: '12,540',
+    change: '+12.5%',
+    trend: 'up',
+    icon: 'Users',
+    color: 'blue',
+  },
+  {
+    id: 'active',
+    label: 'Active Users',
+    value: '8,420',
+    change: '+8.2%',
+    trend: 'up',
+    icon: 'UserCheck',
+    color: 'green',
+  },
+  {
+    id: 'transactions',
+    label: 'Transactions',
+    value: '3,240',
+    change: '+14.8%',
+    trend: 'up',
+    icon: 'CreditCard',
+    color: 'purple',
+  },
+  {
+    id: 'revenue',
+    label: 'Revenue',
+    value: 'Rp 125.4M',
+    change: '+10.4%',
+    trend: 'up',
+    icon: 'DollarSign',
+    color: 'orange',
+  },
+];
+
+export const revenueData = [
+  { month: 'Jan', revenue: 42000, expenses: 28000, profit: 14000 },
+  { month: 'Feb', revenue: 48000, expenses: 30000, profit: 18000 },
+  { month: 'Mar', revenue: 45000, expenses: 27000, profit: 18000 },
+  { month: 'Apr', revenue: 52000, expenses: 31000, profit: 21000 },
+  { month: 'May', revenue: 58000, expenses: 33000, profit: 25000 },
+  { month: 'Jun', revenue: 55000, expenses: 32000, profit: 23000 },
+  { month: 'Jul', revenue: 62000, expenses: 35000, profit: 27000 },
+  { month: 'Aug', revenue: 68000, expenses: 37000, profit: 31000 },
+  { month: 'Sep', revenue: 64000, expenses: 36000, profit: 28000 },
+  { month: 'Oct', revenue: 72000, expenses: 39000, profit: 33000 },
+  { month: 'Nov', revenue: 78000, expenses: 41000, profit: 37000 },
+  { month: 'Dec', revenue: 85000, expenses: 44000, profit: 41000 },
+];
+
+export const performanceData = [
+  { month: 'Jan', desktop: 65, mobile: 35 },
+  { month: 'Feb', desktop: 62, mobile: 38 },
+  { month: 'Mar', desktop: 58, mobile: 42 },
+  { month: 'Apr', desktop: 55, mobile: 45 },
+  { month: 'May', desktop: 52, mobile: 48 },
+  { month: 'Jun', desktop: 48, mobile: 52 },
+  { month: 'Jul', desktop: 45, mobile: 55 },
+  { month: 'Aug', desktop: 42, mobile: 58 },
+  { month: 'Sep', desktop: 40, mobile: 60 },
+  { month: 'Oct', desktop: 38, mobile: 62 },
+  { month: 'Nov', desktop: 35, mobile: 65 },
+  { month: 'Dec', desktop: 32, mobile: 68 },
+];
+
+export const categoryData = [
+  { name: 'Electronics', value: 35, color: '#2563eb' },
+  { name: 'Clothing', value: 25, color: '#3b82f6' },
+  { name: 'Home & Garden', value: 20, color: '#60a5fa' },
+  { name: 'Sports', value: 12, color: '#93c5fd' },
+  { name: 'Others', value: 8, color: '#bfdbfe' },
+];
+
+export const recentActivity = [
+  {
+    id: 1,
+    type: 'user',
+    title: 'New user registered',
+    description: 'Sarah Johnson created a new account',
+    time: '5 minutes ago',
+    status: 'success',
+  },
+  {
+    id: 2,
+    type: 'transaction',
+    title: 'Transaction completed',
+    description: 'Payment of Rp 2,500,000 processed successfully',
+    time: '12 minutes ago',
+    status: 'success',
+  },
+  {
+    id: 3,
+    type: 'report',
+    title: 'Report generated',
+    description: 'Monthly sales report for October 2026',
+    time: '30 minutes ago',
+    status: 'info',
+  },
+  {
+    id: 4,
+    type: 'system',
+    title: 'System configuration updated',
+    description: 'Email notification settings modified',
+    time: '1 hour ago',
+    status: 'warning',
+  },
+  {
+    id: 5,
+    type: 'user',
+    title: 'User role changed',
+    description: 'Michael Chen promoted to Manager',
+    time: '2 hours ago',
+    status: 'info',
+  },
+  {
+    id: 6,
+    type: 'alert',
+    title: 'High CPU usage detected',
+    description: 'Server CPU usage exceeded 90%',
+    time: '3 hours ago',
+    status: 'error',
+  },
+  {
+    id: 7,
+    type: 'transaction',
+    title: 'Refund processed',
+    description: 'Order #ORD-2024-1847 refunded',
+    time: '4 hours ago',
+    status: 'warning',
+  },
+  {
+    id: 8,
+    type: 'user',
+    title: 'New team member',
+    description: 'David Wilson joined the design team',
+    time: '5 hours ago',
+    status: 'success',
+  },
+];
+
+export const usersData = [
+  { id: 1, name: 'Sarah Johnson', email: 'sarah.johnson@company.com', role: 'Admin', status: 'Active', created: '2024-01-15', avatar: 'SJ' },
+  { id: 2, name: 'Michael Chen', email: 'michael.chen@company.com', role: 'Manager', status: 'Active', created: '2024-02-20', avatar: 'MC' },
+  { id: 3, name: 'Emily Davis', email: 'emily.davis@company.com', role: 'User', status: 'Active', created: '2024-03-10', avatar: 'ED' },
+  { id: 4, name: 'James Wilson', email: 'james.wilson@company.com', role: 'User', status: 'Inactive', created: '2024-04-05', avatar: 'JW' },
+  { id: 5, name: 'Lisa Anderson', email: 'lisa.anderson@company.com', role: 'Manager', status: 'Active', created: '2024-05-12', avatar: 'LA' },
+  { id: 6, name: 'Robert Taylor', email: 'robert.taylor@company.com', role: 'User', status: 'Active', created: '2024-06-18', avatar: 'RT' },
+  { id: 7, name: 'Jennifer Brown', email: 'jennifer.brown@company.com', role: 'Admin', status: 'Active', created: '2024-07-22', avatar: 'JB' },
+  { id: 8, name: 'David Martinez', email: 'david.martinez@company.com', role: 'User', status: 'Pending', created: '2024-08-30', avatar: 'DM' },
+  { id: 9, name: 'Amanda Garcia', email: 'amanda.garcia@company.com', role: 'Manager', status: 'Active', created: '2024-09-14', avatar: 'AG' },
+  { id: 10, name: 'Christopher Lee', email: 'christopher.lee@company.com', role: 'User', status: 'Inactive', created: '2024-10-08', avatar: 'CL' },
+  { id: 11, name: 'Jessica White', email: 'jessica.white@company.com', role: 'User', status: 'Active', created: '2024-11-01', avatar: 'JW' },
+  { id: 12, name: 'Daniel Harris', email: 'daniel.harris@company.com', role: 'Admin', status: 'Active', created: '2024-11-15', avatar: 'DH' },
+  { id: 13, name: 'Ashley Clark', email: 'ashley.clark@company.com', role: 'User', status: 'Pending', created: '2024-12-03', avatar: 'AC' },
+  { id: 14, name: 'Matthew Lewis', email: 'matthew.lewis@company.com', role: 'Manager', status: 'Active', created: '2024-12-20', avatar: 'ML' },
+  { id: 15, name: 'Stephanie Walker', email: 'stephanie.walker@company.com', role: 'User', status: 'Active', created: '2025-01-07', avatar: 'SW' },
+  { id: 16, name: 'Andrew Hall', email: 'andrew.hall@company.com', role: 'User', status: 'Inactive', created: '2025-01-25', avatar: 'AH' },
+  { id: 17, name: 'Nicole Allen', email: 'nicole.allen@company.com', role: 'Admin', status: 'Active', created: '2025-02-10', avatar: 'NA' },
+  { id: 18, name: 'Ryan Young', email: 'ryan.young@company.com', role: 'User', status: 'Active', created: '2025-02-28', avatar: 'RY' },
+  { id: 19, name: 'Michelle King', email: 'michelle.king@company.com', role: 'Manager', status: 'Active', created: '2025-03-15', avatar: 'MK' },
+  { id: 20, name: 'Kevin Wright', email: 'kevin.wright@company.com', role: 'User', status: 'Pending', created: '2025-04-01', avatar: 'KW' },
+];
+
+export const dataManagementItems = [
+  { id: 1, name: 'Product Catalog Q4', category: 'Inventory', status: 'Active', owner: 'Sarah Johnson', lastModified: '2026-09-28', size: '2.4 MB' },
+  { id: 2, name: 'Customer Database', category: 'CRM', status: 'Active', owner: 'Michael Chen', lastModified: '2026-09-27', size: '15.8 MB' },
+  { id: 3, name: 'Financial Report 2026', category: 'Finance', status: 'Archived', owner: 'Lisa Anderson', lastModified: '2026-09-25', size: '8.2 MB' },
+  { id: 4, name: 'Marketing Assets', category: 'Marketing', status: 'Active', owner: 'David Wilson', lastModified: '2026-09-24', size: '45.6 MB' },
+  { id: 5, name: 'Employee Records', category: 'HR', status: 'Active', owner: 'Jennifer Brown', lastModified: '2026-09-22', size: '3.1 MB' },
+  { id: 6, name: 'Sales Pipeline', category: 'Sales', status: 'Draft', owner: 'Robert Taylor', lastModified: '2026-09-20', size: '1.8 MB' },
+  { id: 7, name: 'API Documentation', category: 'Technical', status: 'Active', owner: 'Amanda Garcia', lastModified: '2026-09-18', size: '5.4 MB' },
+  { id: 8, name: 'Backup Archive Sep', category: 'System', status: 'Archived', owner: 'System', lastModified: '2026-09-15', size: '128.0 MB' },
+  { id: 9, name: 'User Analytics Data', category: 'Analytics', status: 'Active', owner: 'Christopher Lee', lastModified: '2026-09-12', size: '22.3 MB' },
+  { id: 10, name: 'Contract Templates', category: 'Legal', status: 'Active', owner: 'Jessica White', lastModified: '2026-09-10', size: '4.7 MB' },
+  { id: 11, name: 'Training Materials', category: 'HR', status: 'Draft', owner: 'Daniel Harris', lastModified: '2026-09-08', size: '67.2 MB' },
+  { id: 12, name: 'Security Audit Log', category: 'Security', status: 'Active', owner: 'System', lastModified: '2026-09-05', size: '9.8 MB' },
+];
+
+export const notifications = [
+  {
+    id: 1,
+    title: 'New user registration',
+    message: 'Sarah Johnson has registered as a new user',
+    time: '5 min ago',
+    read: false,
+    type: 'user',
+  },
+  {
+    id: 2,
+    title: 'Payment received',
+    message: 'Payment of Rp 2,500,000 has been received',
+    time: '12 min ago',
+    read: false,
+    type: 'payment',
+  },
+  {
+    id: 3,
+    title: 'Report ready',
+    message: 'Your monthly sales report is ready to download',
+    time: '1 hour ago',
+    read: false,
+    type: 'report',
+  },
+  {
+    id: 4,
+    title: 'System update',
+    message: 'System will undergo maintenance at 2:00 AM',
+    time: '2 hours ago',
+    read: true,
+    type: 'system',
+  },
+  {
+    id: 5,
+    title: 'New comment',
+    message: 'Michael Chen commented on your report',
+    time: '3 hours ago',
+    read: true,
+    type: 'comment',
+  },
+  {
+    id: 6,
+    title: 'Task completed',
+    message: 'Data backup task completed successfully',
+    time: '5 hours ago',
+    read: true,
+    type: 'task',
+  },
+];
+
+export const logsData = [
+  { id: 1, timestamp: '2026-10-01 09:42:15', level: 'INFO', message: 'User login successful: sarah.johnson@company.com', source: 'AuthService' },
+  { id: 2, timestamp: '2026-10-01 09:41:02', level: 'INFO', message: 'Database connection established', source: 'DatabaseManager' },
+  { id: 3, timestamp: '2026-10-01 09:38:45', level: 'WARNING', message: 'High memory usage detected: 85%', source: 'SystemMonitor' },
+  { id: 4, timestamp: '2026-10-01 09:35:12', level: 'ERROR', message: 'Failed to send email notification: SMTP timeout', source: 'EmailService' },
+  { id: 5, timestamp: '2026-10-01 09:32:08', level: 'INFO', message: 'Cache cleared successfully', source: 'CacheManager' },
+  { id: 6, timestamp: '2026-10-01 09:28:33', level: 'INFO', message: 'API request processed: GET /api/users', source: 'APIGateway' },
+  { id: 7, timestamp: '2026-10-01 09:25:17', level: 'WARNING', message: 'Rate limit approaching for API key: ****-1234', source: 'RateLimiter' },
+  { id: 8, timestamp: '2026-10-01 09:22:41', level: 'INFO', message: 'Scheduled job started: daily-backup', source: 'JobScheduler' },
+  { id: 9, timestamp: '2026-10-01 09:18:55', level: 'ERROR', message: 'File upload failed: maximum size exceeded', source: 'FileService' },
+  { id: 10, timestamp: '2026-10-01 09:15:20', level: 'INFO', message: 'User logout: michael.chen@company.com', source: 'AuthService' },
+  { id: 11, timestamp: '2026-10-01 09:12:08', level: 'INFO', message: 'Configuration reloaded', source: 'ConfigManager' },
+  { id: 12, timestamp: '2026-10-01 09:08:44', level: 'WARNING', message: 'SSL certificate expires in 14 days', source: 'CertificateManager' },
+];
+
+export const reportsData = [
+  { id: 1, name: 'Monthly Sales Report', period: 'October 2026', generated: '2026-10-01 08:00', size: '2.4 MB', status: 'Ready' },
+  { id: 2, name: 'User Activity Report', period: 'September 2026', generated: '2026-09-30 17:30', size: '1.8 MB', status: 'Ready' },
+  { id: 3, name: 'Financial Summary Q3', period: 'Q3 2026', generated: '2026-09-28 14:15', size: '5.2 MB', status: 'Ready' },
+  { id: 4, name: 'Inventory Status Report', period: 'October 2026', generated: '2026-09-27 10:45', size: '3.1 MB', status: 'Processing' },
+  { id: 5, name: 'Customer Satisfaction Survey', period: 'September 2026', generated: '2026-09-25 16:20', size: '890 KB', status: 'Ready' },
+  { id: 6, name: 'Security Audit Report', period: 'Q3 2026', generated: '2026-09-22 09:00', size: '4.5 MB', status: 'Ready' },
+  { id: 7, name: 'Marketing Campaign Analysis', period: 'September 2026', generated: '2026-09-20 11:30', size: '6.7 MB', status: 'Failed' },
+  { id: 8, name: 'Employee Performance Review', period: 'Q3 2026', generated: '2026-09-18 13:45', size: '2.9 MB', status: 'Ready' },
+];
