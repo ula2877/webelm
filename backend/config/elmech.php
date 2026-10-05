@@ -70,4 +70,36 @@ return [
         'base_url' => env('ELMECH_FOTO_BASE_URL', ''),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Letter Asset (signature / stamp) Write Permission
+    |--------------------------------------------------------------------------
+    |
+    | Signature and stamp images are stored as files and recorded in the
+    | EXISTING tb_surat_asset table (jenis = 'signature' | 'stamp'). No schema
+    | change is involved - only an INSERT.
+    |
+    | This flag gates that INSERT, following the same pattern as
+    | PROFILE_WRITE_ENABLED. With the flag off the endpoints still run full
+    | validation but refuse the actual write with HTTP 503.
+    |
+    */
+    'letter_asset_write_enabled' => env('LETTER_ASSET_WRITE_ENABLED', true),
+
+    'letter_asset' => [
+
+        // Laravel filesystem disk used to store the uploaded images.
+        'disk' => 'public',
+
+        // Folder inside the disk, i.e. storage/app/public/letter-assets/.
+        // Served publicly through public/storage as /storage/letter-assets/<file>.
+        'directory' => 'letter-assets',
+
+        // Extensions accepted by the signature/stamp upload endpoint.
+        'mimes' => ['jpg', 'jpeg', 'png', 'webp'],
+
+        // Maximum accepted upload size in kilobytes.
+        'max_kb' => 4096,
+    ],
+
 ];

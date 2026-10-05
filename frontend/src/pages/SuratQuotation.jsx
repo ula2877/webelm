@@ -6,6 +6,7 @@ import Badge from '../components/ui/Badge';
 import Pagination from '../components/ui/Pagination';
 import EmptyState from '../components/ui/EmptyState';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as suratService from '../services/surat';
 import { formatDate } from '../utils/helpers';
 
@@ -13,6 +14,7 @@ const ITEMS_PER_PAGE = 6;
 const JENIS_FILTER = 'quotation';
 
 export default function SuratQuotation() {
+  const navigate = useNavigate();
   const [surat, setSurat] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -129,7 +131,9 @@ export default function SuratQuotation() {
           <h2 className="text-2xl font-bold text-text-primary">Surat Penawaran</h2>
           <p className="text-text-secondary mt-1">Kelola surat penawaran</p>
         </div>
-        <Button icon={Plus}>Buat Surat Penawaran</Button>
+        <Button icon={Plus} onClick={() => navigate('/letters/quotation/create')}>
+          Buat Surat Penawaran
+        </Button>
       </div>
 
       {/* Filters */}

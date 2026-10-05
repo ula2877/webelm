@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SuratController;
+use App\Http\Controllers\SuratAssetController;
 use App\Http\Controllers\UserManagementController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -58,6 +59,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/surat', [SuratController::class, 'index']);
     Route::get('/surat/{id}', [SuratController::class, 'show'])
         ->where('id', '[0-9]+');
+
+    // Surat assets (signature / stamp) - operates on the existing tb_surat_asset
+    // table. Files go to the public disk; the absolute URL is stored in `path`.
+    Route::get('/surat-assets', [SuratAssetController::class, 'index']);
+    Route::post('/surat-assets', [SuratAssetController::class, 'store']);
 });
 
 // Fallback route for unauthenticated API requests

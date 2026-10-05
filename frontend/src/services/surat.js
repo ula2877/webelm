@@ -21,3 +21,19 @@ export async function fetchSuratById(id) {
   const response = await api.get(`/api/surat/${id}`);
   return response.data;
 }
+
+// Surat assets (signature / stamp) - backed by the existing tb_surat_asset table.
+export async function fetchSuratAssets(jenis) {
+  const response = await api.get('/api/surat-assets', { params: { jenis } });
+  return response.data;
+}
+
+export async function uploadSuratAsset(jenis, file) {
+  const formData = new FormData();
+  formData.append('jenis', jenis);
+  formData.append('file', file);
+  const response = await api.post('/api/surat-assets', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+}

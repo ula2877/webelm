@@ -167,19 +167,6 @@ export default function SuratOverview() {
           <h2 className="text-2xl font-bold text-text-primary">Surat</h2>
           <p className="text-text-secondary mt-1">Kelola seluruh dokumen surat</p>
         </div>
-        <div className="flex gap-3">
-          <Button 
-            variant="secondary" 
-            icon={ExternalLink}
-            onClick={() => navigate('/letters/quotation')}
-            className="hidden sm:flex"
-          >
-            Kelola Surat Penawaran
-          </Button>
-          <Button icon={Plus} onClick={() => navigate('/letters/quotation/create')}>
-            Buat Surat
-          </Button>
-        </div>
       </div>
 
       {/* KPI Cards Grid - 7 Jenis Surat */}
@@ -257,15 +244,6 @@ export default function SuratOverview() {
             <Clock className="w-5 h-5 text-text-muted" />
             <h3 className="text-lg font-semibold text-text-primary">Surat Terbaru</h3>
           </div>
-          <Button 
-            variant="secondary" 
-            size="sm"
-            icon={ExternalLink}
-            onClick={() => navigate('/letters/quotation')}
-            className="whitespace-nowrap"
-          >
-            Lihat Semua
-          </Button>
         </div>
 
         {isLoadingRecent ? (
@@ -294,7 +272,6 @@ export default function SuratOverview() {
                   <th className="text-left py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Jenis Surat</th>
                   <th className="text-left py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Perihal</th>
                   <th className="text-left py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Tanggal</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Status</th>
                   <th className="text-right py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Aksi</th>
                 </tr>
               </thead>
@@ -314,24 +291,14 @@ export default function SuratOverview() {
                       </td>
                       <td className="py-3 px-4 text-sm text-text-primary max-w-xs truncate">{s.perihal}</td>
                       <td className="py-3 px-4 text-sm text-text-secondary">{s.tanggal}</td>
-                      <td className="py-3 px-4">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          s.status_variant === 'success' ? 'bg-emerald-100 text-emerald-800' :
-                          s.status_variant === 'warning' ? 'bg-amber-100 text-amber-800' :
-                          s.status_variant === 'danger' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {s.status}
-                        </span>
-                      </td>
                       <td className="py-3 px-4 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          icon={ExternalLink}
+                        <button
                           onClick={() => navigate(jenisInfo?.route || '/letters/quotation')}
-                          className="h-8 w-8 p-0"
-                        />
+                          className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                          title="Lihat"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   );
