@@ -45,8 +45,17 @@ export function buildQuotationTotals(items, usePPN, ppnRate, useDP = false, dpRa
   return { total, ppn, ppnRate: rate, grandTotal, dp, dpRate: dpPercent, remaining };
 }
 
-/** Map form state -> tb_surat.data JSON (same keys the existing row uses). */
-export function buildQuotationPayload(form) {
+/**
+ * Map form state -> payload POST /api/surat/quotation.
+ *
+ * `assetIds` = { signature: id_asset|null, stamp: id_asset|null } dari
+ * tb_surat_asset (upload baru atau pilih asset existing). Gambar TIDAK
+ * disimpan di tb_surat - hanya ID asset-nya (id_asset_ttd/id_asset_stempel).
+ *
+ * Posisi disimpan dengan zoom sebagai multiplier (konvensi baris existing
+ * di tb_surat: 1.58 dst), bukan persen seperti di state form.
+ */
+export function buildQuotationPayload(form, assetIds = {}) {
   const items = (form.items || []).map((item, index) => ({
     no_urut: index + 1,
     nama_komponen: item.nama_komponen || '',
@@ -59,36 +68,45 @@ export function buildQuotationPayload(form) {
 
   const totals = buildQuotationTotals(form.items, form.usePPN, form.ppnRate, form.useDP, form.dpRate);
 
+  // percent (state form) -> multiplier (konvensi existing di tb_surat)
+  const position = (x, y, zoomPercent) => ({
+    x: Number(x) || 0,
+    y: Number(y) || 0,
+    zoom: (Number(zoomPercent) || 100) / 100,
+  });
+
   return {
     jenis: 'quotation',
     nomor: form.nomor || '',
     tanggal: form.tanggal || '',
-    total: totals.grandTotal,
-    data: {
-      city: form.city || '',
-      attachment: form.attachment || '',
-      subject: form.subject || '',
-      customerName: form.customerName || '',
-      customerAddress: form.customerAddress || '',
-      systemName: form.systemName || '',
-      usePPN: !!form.usePPN,
-      ppnRate: Number(form.ppnRate) || 0,
-      useDP: !!form.useDP,
-      dpRate: Number(form.dpRate) || 0,
-      useSignature: !!form.useSignature,
-      useStamp: !!form.useStamp,
-      signatureImage: form.signatureImage || null,
-      stampImage: form.stampImage || null,
-      // Positions already follow the existing JSON shape (x / y / zoom).
-      signaturePosition: { x: Number(form.signatureX) || 0, y: Number(form.signatureY) || 0, zoom: Number(form.signatureZoom) || 100 },
-      stampPosition: { x: Number(form.stampX) || 0, y: Number(form.stampY) || 0, zoom: Number(form.stampZoom) || 100 },
-      signature: {
-        companyName: form.companyName || '',
-        signerName: form.signerName || '',
-        signerTitle: form.signerTitle || '',
-      },
-      notes: (form.notes || []).filter((n) => String(n).trim() !== ''),
+    city: form.city || '',
+    attachment: form.attachment || '',
+    subject: form.subject || '',
+    customerName: form.customerName || '',
+    customerAddress: form.customerAddress || '',
+    systemName: form.systemName || '',
+    usePPN: !!form.usePPN,
+    ppnRate: Number(form.ppnRate) || 0,
+    useDP: !!form.useDP,
+    dpRate: Number(form.dpRate) || 0,
+    useSignature: !!form.useSignature,
+    useStamp: !!form.useStamp,
+    // ID asset dari tb_surat_asset (bukan BLOB, bukan URL).
+    signature_asset_id: assetIds.signature || null,
+    stamp_asset_id: assetIds.stamp || null,
+    signaturePosition: form.useSignature
+      ? position(form.signatureX, form.signatureY, form.signatureZoom)
+      : null,
+    stampPosition: form.useStamp
+      ? position(form.stampX, form.stampY, form.stampZoom)
+      : null,
+    signature: {
+      companyName: form.companyName || '',
+      signerName: form.signerName || '',
+      signerTitle: form.signerTitle || '',
     },
+    notes: (form.notes || []).filter((n) => String(n).trim() !== ''),
+    total: totals.grandTotal,
     items,
   };
 }

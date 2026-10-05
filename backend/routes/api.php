@@ -60,6 +60,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/surat/{id}', [SuratController::class, 'show'])
         ->where('id', '[0-9]+');
 
+    // Surat Penawaran - INSERT ke tb_surat + tb_surat_item (existing
+    // tables, no schema change). PDF dibuat SETELAH data tersimpan.
+    Route::post('/surat/quotation', [SuratController::class, 'storeQuotation']);
+    Route::get('/surat/{id}/pdf', [SuratController::class, 'pdf'])
+        ->where('id', '[0-9]+');
+
     // Surat assets (signature / stamp) - operates on the existing tb_surat_asset
     // table. Files go to the public disk; the absolute URL is stored in `path`.
     Route::get('/surat-assets', [SuratAssetController::class, 'index']);

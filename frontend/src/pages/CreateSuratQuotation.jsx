@@ -10,7 +10,6 @@ import {
   ChevronUp,
   ChevronDown,
   Loader2,
-  RotateCcw,
   Upload,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
@@ -24,9 +23,6 @@ import {
   emptyItem,
   formatNomorSurat,
   validateQuotation,
-  saveDraft,
-  loadDraft,
-  clearDraft,
   buildQuotationPayload,
   computeItemSubtotal,
   buildQuotationTotals,
@@ -297,10 +293,12 @@ export default function CreateSuratQuotation() {
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Frontend-only: surface a locally saved draft, if any (no backend/draft API).
-  const [initialDraft] = useState(() => loadDraft());
-  const [draftInfo, setDraftInfo] = useState(initialDraft?.savedAt ?? null);
-  const [showDraftPrompt, setShowDraftPrompt] = useState(!!initialDraft?.form);
+  // Hasil save terakhir (id/uuid dari backend) - surat yang tersimpan.
+  const [savedSurat, setSavedSurat] = useState(null);
+  // ID asset (tb_surat_asset) yang dipilih untuk tanda tangan/stempel.
+  // null = tidak pakai / belum dipilih. Gambar tidak disimpan di form,
+  // hanya ID-nya yang dikirim ke backend (id_asset_ttd/id_asset_stempel).
+  const [assetIds, setAssetIds] = useState({ signature: null, stamp: null });
 
   // ---- Live preview zoom (fit-to-width by default) ----
   const previewViewportRef = useRef(null);
@@ -440,6 +438,8 @@ export default function CreateSuratQuotation() {
         const res = await suratService.uploadSuratAsset(jenis, file);
         if (res.status === 'ok' && res.data?.url) {
           setForm((prev) => ({ ...prev, [field]: res.data.url }));
+          // Simpan ID asset-nya (bukan URL) untuk dikirim ke backend.
+          setAssetIds((prev) => ({ ...prev, [jenis]: res.data.id ?? null }));
           // Refresh the "file sebelumnya" list so the new asset appears there.
           loadAssets(jenis);
         } else {
@@ -457,14 +457,17 @@ export default function CreateSuratQuotation() {
     [loadAssets]
   );
 
-  const handleSelectAsset = useCallback((field, url) => {
+  const handleSelectAsset = useCallback((field, url, assetId) => {
     setForm((prev) => ({ ...prev, [field]: url }));
+    // Pilih asset existing = pakai ID asset yang sudah ada di tb_surat_asset.
+    setAssetIds((prev) => ({ ...prev, [field === 'signatureImage' ? 'signature' : 'stamp']: assetId ?? null }));
   }, []);
 
   // Assets are chosen by URL; "Hapus" only detaches it from this form. The
   // stored record in tb_surat_asset is never deleted (reusable on other letters).
   const handleImageRemove = useCallback((field) => {
     setForm((prev) => ({ ...prev, [field]: null }));
+    setAssetIds((prev) => ({ ...prev, [field === 'signatureImage' ? 'signature' : 'stamp']: null }));
   }, []);
 
   // ---------------------------------------------------------------- items
@@ -505,57 +508,69 @@ export default function CreateSuratQuotation() {
     }));
 
   // ---------------------------------------------------------------- actions
-  const handleRestoreDraft = () => {
-    const draft = loadDraft();
-    if (draft?.form) {
-      setForm({ ...createInitialForm(), ...draft.form });
-      showNotice('success', 'Draft berhasil dimuat.');
-    }
-    setShowDraftPrompt(false);
-  };
-
-  const handleDiscardDraft = () => {
-    clearDraft();
-    setDraftInfo(null);
-    setShowDraftPrompt(false);
-  };
-
-  const handleSaveDraft = () => {
-    const saved = saveDraft(form);
-    if (saved) {
-      const now = new Date().toISOString();
-      setDraftInfo(now);
-      setShowDraftPrompt(false);
-      showNotice('success', 'Draft disimpan di perangkat ini (belum tersimpan ke server).');
-    } else {
-      showNotice('error', 'Gagal menyimpan draft di perangkat ini.');
-    }
-  };
-
-  const handleGenerate = () => {
+  // Validasi dulu (frontend), lalu backend memvalidasi ulang.
+  const validateForm = () => {
     const { valid, errors: validationErrors } = validateQuotation(form);
     setErrors(validationErrors);
     if (!valid) {
-      showNotice('error', 'Lengkapi field wajib sebelum generate surat.');
-      return;
+      showNotice('error', 'Lengkapi field wajib sebelum menyimpan surat.');
+      return false;
     }
+    return true;
+  };
 
+  // SIMPAN: validasi -> POST /api/surat/quotation -> tb_surat.
+  // Tidak download PDF. User tetap di halaman ini.
+  const handleSave = async () => {
+    if (isSubmitting || !validateForm()) return;
     setIsSubmitting(true);
-    // Frontend-only: not persisted to the server (no create/PDF endpoint yet and
-    // the database is read-only). We log the exact payload the backend would
-    // receive, then trigger the browser's print-to-PDF on the live preview.
-    //
-    // eslint-disable-next-line no-console
-    console.log('[quotation] payload siap kirim:', buildQuotationPayload(form));
-
-    setTimeout(() => {
+    try {
+      const payload = buildQuotationPayload(form, assetIds);
+      const res = await suratService.saveQuotation(payload);
+      if (res.status === 'ok') {
+        setSavedSurat(res.data);
+        showNotice('success', res.message || 'Surat penawaran berhasil disimpan.');
+      } else {
+        showNotice('error', res.message || 'Gagal menyimpan surat. Silakan coba lagi.');
+      }
+    } catch (err) {
+      showNotice('error', err.message || 'Gagal menyimpan surat. Silakan coba lagi.');
+    } finally {
       setIsSubmitting(false);
-      showNotice(
-        'success',
-        'Preview siap. Gunakan dialog cetak untuk menyimpan sebagai PDF.'
-      );
-      window.print();
-    }, 250);
+    }
+  };
+
+  // SIMPAN & DOWNLOAD PDF: urutan WAJIB save -> berhasil -> generate PDF ->
+  // download. Jika save gagal, PDF tidak dibuat/diunduh.
+  const handleSaveAndDownload = async () => {
+    if (isSubmitting || !validateForm()) return;
+    setIsSubmitting(true);
+    try {
+      const payload = buildQuotationPayload(form, assetIds);
+      const res = await suratService.saveQuotation(payload);
+      if (res.status !== 'ok' || !res.data?.id) {
+        showNotice('error', res.message || 'Gagal menyimpan surat. Silakan coba lagi.');
+        return;
+      }
+      setSavedSurat(res.data);
+
+      // Baru setelah data tersimpan: generate + download PDF.
+      const blob = await suratService.downloadQuotationPdf(res.data.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Surat-Penawaran-${String(res.data.nomor || res.data.id).replace(/[\\/:*?"<>|]+/g, '_')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      showNotice('success', 'Surat tersimpan dan PDF berhasil diunduh.');
+    } catch (err) {
+      showNotice('error', err.message || 'Gagal menyimpan surat / mengunduh PDF. Silakan coba lagi.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -581,19 +596,20 @@ export default function CreateSuratQuotation() {
             type="button"
             variant="secondary"
             icon={Save}
-            onClick={handleSaveDraft}
+            onClick={handleSave}
+            loading={isSubmitting}
             className="whitespace-nowrap"
           >
-            Simpan Draft
+            Simpan
           </Button>
           <Button
             type="button"
-            icon={isSubmitting ? Loader2 : FileDown}
-            onClick={handleGenerate}
-            disabled={isSubmitting}
+            icon={FileDown}
+            onClick={handleSaveAndDownload}
+            loading={isSubmitting}
             className="whitespace-nowrap"
           >
-            {isSubmitting ? 'Memproses...' : 'Generate Surat'}
+            Simpan &amp; Download PDF
           </Button>
         </div>
       </div>
@@ -618,24 +634,6 @@ export default function CreateSuratQuotation() {
           >
             ✕
           </button>
-        </div>
-      )}
-
-      {/* Draft prompt (frontend-only) */}
-      {showDraftPrompt && (
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-lg border border-blue-200 bg-blue-50 text-blue-800">
-          <p className="text-sm flex-1">
-            Ditemukan draft tersimpan di perangkat ini
-            {draftInfo ? ` (${new Date(draftInfo).toLocaleString('id-ID')})` : ''}.
-          </p>
-          <div className="flex gap-2">
-            <Button type="button" size="sm" icon={RotateCcw} onClick={handleRestoreDraft}>
-              Muat Draft
-            </Button>
-            <Button type="button" size="sm" variant="secondary" onClick={handleDiscardDraft}>
-              Abaikan
-            </Button>
-          </div>
         </div>
       )}
 
@@ -983,7 +981,7 @@ export default function CreateSuratQuotation() {
                       assetsLoading={assetsLoading.signature}
                       uploading={uploading.signature}
                       onUploadFile={(file) => handleUploadAsset('signature', 'signatureImage', 'signature', file)}
-                      onSelectAsset={(asset) => handleSelectAsset('signatureImage', asset.url)}
+                      onSelectAsset={(asset) => handleSelectAsset('signatureImage', asset.url, asset.id)}
                       onChange={(key, value) => setField({ x: 'signatureX', y: 'signatureY', zoom: 'signatureZoom' }[key], value)}
                       onRemove={() => handleImageRemove('signatureImage')}
                     />
@@ -1013,7 +1011,7 @@ export default function CreateSuratQuotation() {
                       assetsLoading={assetsLoading.stamp}
                       uploading={uploading.stamp}
                       onUploadFile={(file) => handleUploadAsset('stamp', 'stampImage', 'stamp', file)}
-                      onSelectAsset={(asset) => handleSelectAsset('stampImage', asset.url)}
+                      onSelectAsset={(asset) => handleSelectAsset('stampImage', asset.url, asset.id)}
                       onChange={(key, value) => setField({ x: 'stampX', y: 'stampY', zoom: 'stampZoom' }[key], value)}
                       onRemove={() => handleImageRemove('stampImage')}
                     />

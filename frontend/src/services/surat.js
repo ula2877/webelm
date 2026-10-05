@@ -37,3 +37,19 @@ export async function uploadSuratAsset(jenis, file) {
   });
   return response.data;
 }
+
+// Simpan Surat Penawaran ke tb_surat (+ tb_surat_item) via Laravel.
+// Urutan backend: SAVE dulu, PDF baru dibuat setelah data tersimpan.
+export async function saveQuotation(payload) {
+  const response = await api.post('/api/surat/quotation', payload);
+  return response.data;
+}
+
+// Unduh PDF surat penawaran yang sudah tersimpan (A4, desain = Live Preview).
+// Mengembalikan Blob agar bisa di-download langsung ke browser.
+export async function downloadQuotationPdf(id) {
+  const response = await api.get(`/api/surat/${id}/pdf`, {
+    responseType: 'blob',
+  });
+  return response.data;
+}
