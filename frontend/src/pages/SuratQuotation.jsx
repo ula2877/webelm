@@ -267,7 +267,7 @@ export default function SuratQuotation() {
                   <tr className="border-b border-border bg-gray-50/50">
                     <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Nomor</th>
                     <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Perihal</th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Pengirim</th>
+                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Penerima</th>
                     <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Tanggal</th>
                     <th className="text-right py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Aksi</th>
                   </tr>

@@ -14,21 +14,22 @@ import {
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input, { Textarea, Select } from '../components/ui/Input';
-import QuotationPreview from '../components/QuotationPreview';
+import InvoicePreview from '../components/InvoicePreview';
+import { ImageAssetField } from './CreateSuratQuotation';
 import { buildPreviewHtml } from '../utils/quotationPrintHtml';
 import { cn } from '../utils/helpers';
 import * as suratService from '../services/surat';
 import {
-  createInitialForm,
+  createInitialInvoiceForm,
   emptyItem,
-  validateQuotation,
-  buildQuotationPayload,
+  validateInvoice,
+  buildInvoicePayload,
   computeItemSubtotal,
-  buildQuotationTotals,
+  buildInvoiceTotals,
   validateImageFile,
   rupiah,
-  formFromQuotationDetail,
-} from '../utils/quotation';
+  formFromInvoiceDetail,
+} from '../utils/invoice';
 
 const SECTION_HEADING = 'text-base font-semibold text-text-primary';
 const SECTION_SUBTITLE = 'text-sm text-text-secondary mt-0.5';
@@ -41,7 +42,7 @@ const ZOOM_LEVELS = [50, 60, 70, 80, 90, 100, 110, 125, 150];
 const ZOOM_MIN = ZOOM_LEVELS[0];
 const ZOOM_MAX = ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
 
-export function ZoomControls({ zoom, isFit, canZoomIn, canZoomOut, onZoomIn, onZoomOut, onFit }) {
+function ZoomControls({ zoom, isFit, canZoomIn, canZoomOut, onZoomIn, onZoomOut, onFit }) {
   const btnClass =
     'p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
   return (
@@ -86,7 +87,7 @@ export function ZoomControls({ zoom, isFit, canZoomIn, canZoomOut, onZoomIn, onZ
   );
 }
 
-export function Section({ title, subtitle, children }) {
+function Section({ title, subtitle, children }) {
   return (
     <Card>
       <div className="mb-4">
@@ -98,7 +99,7 @@ export function Section({ title, subtitle, children }) {
   );
 }
 
-export function Toggle({ checked, onChange, label, description }) {
+function Toggle({ checked, onChange, label, description }) {
   return (
     <label className="flex items-start gap-3 cursor-pointer select-none">
       <button
@@ -126,174 +127,13 @@ export function Toggle({ checked, onChange, label, description }) {
   );
 }
 
-// Upload + position controls for a signature/stamp image.
-// Files are uploaded to the server (stored in tb_surat_asset); the preview
-// shows the resulting URL. Positions use sliders (realtime).
-export function ImageAssetField({
-  label,
-  kind,
-  image,
-  x,
-  y,
-  zoom,
-  error,
-  assets,
-  assetsLoading,
-  uploading,
-  onUploadFile,
-  onSelectAsset,
-  onChange,
-  onRemove,
-}) {
-  const inputId = `upload-${kind}`;
-  const [mode, setMode] = useState('new'); // 'new' | 'library'
-
-  const slider = (sliderLabel, value, key, min, max, step, suffix = '') => (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <label className="text-xs font-medium text-text-secondary">{sliderLabel}</label>
-        <span className="text-xs font-semibold text-text-primary tabular-nums">
-          {value}
-          {suffix}
-        </span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(key, Number(e.target.value))}
-        className="w-full accent-primary-600"
-      />
-    </div>
-  );
-
-  return (
-    <div className="rounded-lg border border-border p-4 bg-gray-50/40">
-      {/* Mode switch */}
-      <div className="inline-flex rounded-lg border border-border overflow-hidden mb-3">
-        <button
-          type="button"
-          onClick={() => setMode('new')}
-          className={cn(
-            'px-3 py-1.5 text-xs font-medium transition-colors',
-            mode === 'new' ? 'bg-primary-600 text-white' : 'bg-white text-text-secondary hover:bg-gray-50'
-          )}
-        >
-          Upload File Baru
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('library')}
-          className={cn(
-            'px-3 py-1.5 text-xs font-medium transition-colors border-l border-border',
-            mode === 'library' ? 'bg-primary-600 text-white' : 'bg-white text-text-secondary hover:bg-gray-50'
-          )}
-        >
-          Gunakan File Sebelumnya
-        </button>
-      </div>
-
-      {mode === 'new' ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <label
-            htmlFor={inputId}
-            className={cn(
-              'inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-white text-sm font-medium text-text-primary transition-colors cursor-pointer hover:bg-gray-50',
-              uploading && 'opacity-50 pointer-events-none'
-            )}
-          >
-            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            {uploading ? 'Mengunggah...' : 'Pilih File'}
-          </label>
-          <input
-            id={inputId}
-            type="file"
-            accept="image/png,image/jpeg,image/jpg,image/webp"
-            className="hidden"
-            onChange={(e) => {
-              onUploadFile(e.target.files?.[0]);
-              e.target.value = '';
-            }}
-          />
-          <span className="text-xs text-text-muted">PNG, JPG, JPEG, atau WEBP.</span>
-        </div>
-      ) : (
-        <div>
-          {assetsLoading ? (
-            <div className="flex items-center gap-2 text-xs text-text-muted py-2">
-              <Loader2 className="w-4 h-4 animate-spin" /> Memuat file...
-            </div>
-          ) : assets.length === 0 ? (
-            <p className="text-xs text-text-muted py-2">Belum ada file {label.toLowerCase()} tersimpan.</p>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {assets.map((asset) => (
-                <button
-                  key={asset.id}
-                  type="button"
-                  onClick={() => onSelectAsset(asset)}
-                  className={cn(
-                    'rounded-lg border bg-white p-2 flex flex-col items-center gap-1 transition-colors hover:border-primary-400',
-                    image === asset.url ? 'border-primary-500 ring-1 ring-primary-500' : 'border-border'
-                  )}
-                  title={asset.original_name || `Asset #${asset.id}`}
-                >
-                  <img
-                    src={asset.url}
-                    alt={asset.original_name || label}
-                    className="h-14 w-full object-contain"
-                  />
-                  <span className="text-[10px] text-text-muted truncate w-full text-center">
-                    {asset.original_name || `#${asset.id}`}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {error && <p className="mt-2 text-xs text-error">{error}</p>}
-
-      {/* Active image + actions */}
-      {image && (
-        <div className="mt-3 flex items-start gap-3 border-t border-border pt-3">
-          <div className="w-24 h-24 shrink-0 rounded-lg border border-border bg-white flex items-center justify-center overflow-hidden">
-            <img src={image} alt={label} className="max-w-full max-h-full object-contain" />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={onRemove}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              Hapus
-            </button>
-          </div>
-        </div>
-      )}
-
-      {image && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
-          {slider('Posisi X', x, 'x', -150, 150, 1)}
-          {slider('Posisi Y', y, 'y', -150, 150, 1)}
-          {slider('Zoom', zoom, 'zoom', 10, 300, 5, '%')}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function CreateSuratQuotation() {
+export default function CreateSuratInvoice() {
   const navigate = useNavigate();
   const { id: editId } = useParams();
   const isEditMode = Boolean(editId);
   const [isLoadingDetail, setIsLoadingDetail] = useState(isEditMode);
   const [loadError, setLoadError] = useState(null);
-  const [form, setForm] = useState(createInitialForm);
+  const [form, setForm] = useState(createInitialInvoiceForm);
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -376,8 +216,8 @@ export default function CreateSuratQuotation() {
   };
 
   const totals = useMemo(
-    () => buildQuotationTotals(form.items, form.usePPN, form.ppnRate, form.useDP, form.dpRate),
-    [form.items, form.usePPN, form.ppnRate, form.useDP, form.dpRate]
+    () => buildInvoiceTotals(form.items, form.usePPN, form.ppnRate),
+    [form.items, form.usePPN, form.ppnRate]
   );
 
   const showNotice = useCallback((type, message) => {
@@ -404,7 +244,7 @@ export default function CreateSuratQuotation() {
       return undefined;
     }
     suratService
-      .fetchNextQuotationNumber(form.tanggal)
+      .fetchNextInvoiceNumber(form.tanggal)
       .then((res) => {
         if (!cancelled && res?.status === 'ok') {
           setForm((prev) => ({ ...prev, nomor: res.data.nomor }));
@@ -438,7 +278,7 @@ export default function CreateSuratQuotation() {
           signature: s.id_asset_ttd ?? null,
           stamp: s.id_asset_stempel ?? null,
         });
-        setForm((prev) => ({ ...prev, ...formFromQuotationDetail(s) }));
+        setForm((prev) => ({ ...prev, ...formFromInvoiceDetail(s) }));
       })
       .catch((err) => {
         if (!cancelled) setLoadError(err.message || 'Gagal memuat data surat.');
@@ -472,6 +312,56 @@ export default function CreateSuratQuotation() {
       setAssetsLoading((prev) => ({ ...prev, [jenis]: false }));
     }
   }, [showNotice]);
+
+  // Daftar Surat Penawaran untuk "Ambil dari Surat Penawaran".
+  const [quotationOptions, setQuotationOptions] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    suratService
+      .fetchSurat({ search: '', jenis: 'quotation', page: 1, perPage: 100 })
+      .then((res) => {
+        if (!cancelled && res?.status === 'ok') setQuotationOptions(res.data || []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Pilih Surat Penawaran -> isi customer/item/nomorPenawaran tanpa mengubah
+  // Surat Penawaran sumbernya.
+  const handleSourceQuotationChange = async (id) => {
+    setField('sumberQuotationId', id ? Number(id) : null);
+    if (!id) return;
+    try {
+      const res = await suratService.fetchQuotationDetail(id);
+      if (res?.status === 'ok' && res.data) {
+        const d = res.data.data || {};
+        setForm((prev) => ({
+          ...prev,
+          sumberQuotationId: Number(id),
+          nomorPenawaran: res.data.nomor || '',
+          customerName: d.customerName || '',
+          customerAddress: d.customerAddress || '',
+          city: d.city || prev.city,
+          usePPN: !!d.usePPN,
+          ppnRate: d.ppnRate ?? 11,
+          items: Array.isArray(res.data.items) && res.data.items.length
+            ? res.data.items.map((it) => ({
+                id: `item-${Math.random().toString(36).slice(2, 9)}`,
+                nama_komponen: it.nama_komponen ?? '',
+                spesifikasi: Array.isArray(it.spesifikasi) ? it.spesifikasi.join('\n') : '',
+                volume: it.volume ?? '',
+                satuan: it.satuan ?? '',
+                harga_satuan: it.harga_satuan ?? '',
+              }))
+            : prev.items,
+        }));
+      }
+    } catch (err) {
+      showNotice('error', err.message || 'Gagal mengambil data surat penawaran.');
+    }
+  };
 
   // Load the previously stored signature/stamp lists once on mount.
   useEffect(() => {
@@ -548,23 +438,10 @@ export default function CreateSuratQuotation() {
       return { ...prev, items };
     });
 
-  // ---------------------------------------------------------------- notes
-  const addNote = () => setForm((prev) => ({ ...prev, notes: [...prev.notes, ''] }));
-  const removeNote = (index) =>
-    setForm((prev) => ({
-      ...prev,
-      notes: prev.notes.length > 1 ? prev.notes.filter((_, i) => i !== index) : [''],
-    }));
-  const updateNote = (index, value) =>
-    setForm((prev) => ({
-      ...prev,
-      notes: prev.notes.map((note, i) => (i === index ? value : note)),
-    }));
-
   // ---------------------------------------------------------------- actions
   // Validasi dulu (frontend), lalu backend memvalidasi ulang.
   const validateForm = () => {
-    const { valid, errors: validationErrors } = validateQuotation(form);
+    const { valid, errors: validationErrors } = validateInvoice(form);
     setErrors(validationErrors);
     if (!valid) {
       showNotice('error', 'Lengkapi field wajib sebelum menyimpan surat.');
@@ -579,11 +456,11 @@ export default function CreateSuratQuotation() {
     if (isSubmitting || !validateForm()) return;
     setIsSubmitting(true);
     try {
-      const payload = buildQuotationPayload(form, assetIds);
+      const payload = buildInvoicePayload(form, assetIds);
       // CREATE -> INSERT baru, EDIT -> UPDATE record yang sama.
       const res = isEditMode
-        ? await suratService.updateQuotation(editId, payload)
-        : await suratService.saveQuotation(payload);
+        ? await suratService.updateInvoice(editId, payload)
+        : await suratService.saveInvoice(payload);
       if (res.status !== 'ok' || (!isEditMode && !res.data?.id)) {
         showNotice('error', res.message || 'Gagal menyimpan surat. Silakan coba lagi.');
         return;
@@ -626,8 +503,8 @@ export default function CreateSuratQuotation() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h2 className="text-2xl font-bold text-text-primary">{isEditMode ? 'Edit Surat Penawaran' : 'Buat Surat Penawaran'}</h2>
-            <p className="text-text-secondary mt-1">{isEditMode ? 'Ubah surat penawaran dengan live preview' : 'Susun penawaran dengan live preview'}</p>
+            <h2 className="text-2xl font-bold text-text-primary">{isEditMode ? 'Edit Invoice' : 'Buat Invoice'}</h2>
+            <p className="text-text-secondary mt-1">{isEditMode ? 'Ubah invoice dengan live preview' : 'Susun invoice dengan live preview'}</p>
           </div>
         </div>
         <div className="flex gap-3">
@@ -682,7 +559,35 @@ export default function CreateSuratQuotation() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* ---------------------------------------------------------- FORM */}
         <div className="lg:col-span-1 min-w-0 space-y-6">
-          {/* 1. Informasi Surat */}
+          {/* 1. Informasi Sumber Invoice */}
+          <Section title="Informasi Sumber Invoice">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Select
+                label="Ambil dari Surat Penawaran"
+                value={form.sumberQuotationId || ''}
+                onChange={(e) => handleSourceQuotationChange(e.target.value)}
+              >
+                <option value="">-- Pilih Surat Penawaran (opsional) --</option>
+                {quotationOptions.map((q) => (
+                  <option key={q.id} value={q.id}>{q.nomor}</option>
+                ))}
+              </Select>
+              <Input
+                label="Nomor Penawaran"
+                value={form.nomorPenawaran}
+                onChange={(e) => setField('nomorPenawaran', e.target.value)}
+                placeholder="Masukkan nomor penawaran"
+              />
+              <Input
+                label="Nomor PO/SPK"
+                value={form.nomorPo}
+                onChange={(e) => setField('nomorPo', e.target.value)}
+                placeholder="Masukkan nomor PO/SPK"
+              />
+            </div>
+          </Section>
+
+          {/* 2. Informasi Surat */}
           <Section title="Informasi Surat">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
@@ -694,33 +599,12 @@ export default function CreateSuratQuotation() {
                 readOnly
               />
               <Input
-                label="Tanggal Surat"
+                label="Tanggal Invoice"
                 type="date"
                 value={form.tanggal}
                 onChange={(e) => handleTanggalChange(e.target.value)}
                 error={errors.tanggal}
               />
-              <Input
-                label="Kota"
-                value={form.city}
-                onChange={(e) => setField('city', e.target.value)}
-                placeholder="Masukkan kota"
-              />
-              <Input
-                label="Lampiran"
-                value={form.attachment}
-                onChange={(e) => setField('attachment', e.target.value)}
-                placeholder="Masukkan lampiran"
-              />
-              <div className="sm:col-span-2">
-                <Input
-                  label="Hal / Judul Surat"
-                  value={form.subject}
-                  onChange={(e) => setField('subject', e.target.value)}
-                  error={errors.subject}
-                  placeholder="Masukkan hal / judul surat"
-                />
-              </div>
             </div>
           </Section>
 
@@ -745,19 +629,7 @@ export default function CreateSuratQuotation() {
             </div>
           </Section>
 
-          {/* 3. Deskripsi Penawaran */}
-          <Section title="Deskripsi Penawaran">
-            <div className="grid grid-cols-1 gap-4">
-              <Input
-                label="Nama / Deskripsi Sistem yang Ditawarkan"
-                value={form.systemName}
-                onChange={(e) => setField('systemName', e.target.value)}
-                placeholder="Masukkan nama / deskripsi sistem"
-              />
-            </div>
-          </Section>
-
-          {/* 4. Komponen / Item Penawaran */}
+          {/* 4. Komponen / Item */}
           <Section
             title="Komponen / Item Penawaran"
             subtitle="Tambahkan satu atau lebih komponen beserta harga satuan."
@@ -898,26 +770,6 @@ export default function CreateSuratQuotation() {
                   />
                 </div>
               )}
-              <Toggle
-                checked={form.useDP}
-                onChange={(v) => setField('useDP', v)}
-                label="Gunakan DP"
-                description="Tambahkan Down Payment sebagai biaya di awal."
-              />
-              {form.useDP && (
-                <div className="sm:max-w-[200px]">
-                  <Input
-                    label="Persentase DP (%)"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={form.dpRate}
-                    onChange={(e) => setField('dpRate', e.target.value)}
-                    placeholder="Masukkan persentase DP"
-                  />
-                </div>
-              )}
               <div className="rounded-lg border border-border bg-gray-50/60 p-4 space-y-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-text-secondary">Total</span>
@@ -935,51 +787,7 @@ export default function CreateSuratQuotation() {
                   <span className="font-semibold text-text-primary">Grand Total</span>
                   <span className="font-bold text-primary-700">{rupiah(totals.grandTotal)}</span>
                 </div>
-                {form.useDP && (
-                  <>
-                    <div className="flex items-center justify-between pt-2 border-t border-border">
-                      <span className="text-text-secondary">
-                        DP ({Number(form.dpRate) || 0}%)
-                      </span>
-                      <span className="font-medium text-text-primary">{rupiah(totals.dp)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-text-primary">Sisa Pembayaran</span>
-                      <span className="font-bold text-primary-700">{rupiah(totals.remaining)}</span>
-                    </div>
-                  </>
-                )}
               </div>
-            </div>
-          </Section>
-
-          {/* 6. Keterangan */}
-          <Section title="Keterangan">
-            <div className="space-y-3">
-              {form.notes.map((note, index) => (
-                <div key={index} className="flex items-start gap-2">
-                  <div className="flex-1">
-                    <Input
-                      value={note}
-                      onChange={(e) => updateNote(index, e.target.value)}
-                      placeholder="Masukkan keterangan"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeNote(index)}
-                    className="mt-0.5 p-2.5 rounded-lg text-text-muted hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
-                    title="Hapus keterangan"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4">
-              <Button type="button" variant="secondary" size="sm" icon={Plus} onClick={addNote}>
-                Tambah Keterangan
-              </Button>
             </div>
           </Section>
 
@@ -1077,7 +885,7 @@ export default function CreateSuratQuotation() {
             <div className="flex items-center justify-between gap-2 px-5 py-3 border-b border-border bg-gray-50/60">
               <div className="flex items-center gap-2 min-w-0">
                 <h3 className="text-sm font-semibold text-text-primary">Live Preview</h3>
-                <span className="hidden sm:inline text-xs text-text-muted">A4 · Surat Penawaran</span>
+                <span className="hidden sm:inline text-xs text-text-muted">A4 · Invoice</span>
               </div>
               <ZoomControls
                 zoom={effectiveZoom}
@@ -1094,7 +902,7 @@ export default function CreateSuratQuotation() {
               className="p-3 sm:p-4 bg-gray-100 max-h-[78vh] overflow-auto"
             >
               <div className="letter-zoom w-fit mx-auto" style={{ zoom: scale }}>
-                <QuotationPreview form={form} />
+                <InvoicePreview form={form} />
               </div>
             </div>
           </Card>

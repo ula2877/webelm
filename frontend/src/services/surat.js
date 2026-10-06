@@ -51,6 +51,43 @@ export async function fetchQuotationDetail(id) {
   return response.data;
 }
 
+// Nomor berikutnya untuk invoice.
+export async function fetchNextInvoiceNumber(tanggal) {
+  const response = await api.get('/api/surat/invoice/next-number', { params: { tanggal } });
+  return response.data;
+}
+
+// Simpan invoice baru (tb_surat jenis='invoice').
+export async function saveInvoice(payload) {
+  const response = await api.post('/api/surat/invoice', payload);
+  return response.data;
+}
+
+// Update invoice existing (record tb_surat yang sama).
+export async function updateInvoice(id, payload) {
+  const response = await api.put(`/api/surat/${id}/invoice`, payload);
+  return response.data;
+}
+
+// Nomor berikutnya untuk surat generik
+// (delivery-note, bast, inspection-request, payment-request, kuitansi).
+export async function fetchNextSuratJenisNumber(jenis, tanggal) {
+  const response = await api.get(`/api/surat/${jenis}/next-number`, { params: { tanggal } });
+  return response.data;
+}
+
+// Simpan surat generik baru (tb_surat jenis sesuai URL).
+export async function saveSuratJenis(jenis, payload) {
+  const response = await api.post(`/api/surat/${jenis}`, payload);
+  return response.data;
+}
+
+// Update surat generik existing (record tb_surat yang sama).
+export async function updateSuratJenis(id, jenis, payload) {
+  const response = await api.put(`/api/surat/${id}/${jenis}`, payload);
+  return response.data;
+}
+
 // Soft delete surat (set deleted_at) - mekanisme existing tb_surat.
 export async function deleteSurat(id) {
   const response = await api.delete(`/api/surat/${id}`);

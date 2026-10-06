@@ -254,6 +254,54 @@ p.text-text-secondary.mt-1 {
   margin: 0.2mm 0;
 }
 
+/* Invoice title */
+.invoice-title {
+  text-align: center;
+  font-size: 18pt;
+  font-weight: 700;
+  letter-spacing: 4px;
+  margin-bottom: 4mm;
+}
+
+/* Invoice header: 2 kolom (customer kiri | info invoice kanan).
+   Layout stabil - bukan spasi/manual padding. */
+.letter-invoice-header-block {
+  margin-bottom: 4mm;
+}
+.letter-invoice-header {
+  display: flex;
+  gap: 10mm;
+  align-items: flex-start;
+}
+.letter-invoice-customer {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.letter-invoice-customer .customer-name {
+  font-weight: 700;
+  margin-bottom: 0.5mm;
+  word-break: break-word;
+}
+.letter-invoice-customer .customer-address {
+  white-space: pre-line;
+  word-break: break-word;
+}
+.letter-invoice-meta {
+  flex: 1 1 0;
+  min-width: 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.letter-invoice-meta td {
+  vertical-align: top;
+  padding: 0.3mm 0;
+  word-break: break-word;
+}
+.letter-invoice-meta td:nth-child(2) {
+  padding-right: 1.5mm;
+  white-space: nowrap;
+}
+
 /* Totals */
 .letter-totals {
   display: flex;
@@ -307,6 +355,81 @@ p.text-text-secondary.mt-1 {
   transform-origin: center center;
 }
 .letter-signature .signer-name {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   Invoice-specific: bank table + signature (tidak shared dengan quotation)
+   ========================================================================== */
+
+/* Bank info - 4 column table */
+.invoice-bank {
+  margin-top: 4mm;
+}
+.invoice-bank-title {
+  font-weight: 600;
+  margin-bottom: 1.5mm;
+}
+.invoice-bank-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.invoice-bank-table th,
+.invoice-bank-table td {
+  border: 1px solid #000;
+  padding: 1.2mm 1.8mm;
+  font-size: 9.5pt;
+  vertical-align: top;
+  word-break: break-word;
+  text-align: left;
+}
+.invoice-bank-table th {
+  background: #f1f5f9;
+  font-weight: 700;
+  text-align: center;
+}
+.col-bank-name { width: 18%; }
+.col-bank-account { width: 18%; }
+.col-bank-owner { width: 32%; }
+.col-bank-branch { width: 32%; }
+
+/* Invoice closing + signature */
+.invoice-closing {
+  text-align: right;
+  margin-bottom: 4mm;
+}
+.invoice-signature {
+  margin-top: 6mm;
+  margin-left: auto;
+  margin-right: 8mm;
+  width: 75mm;
+  text-align: left;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.invoice-signature-box {
+  height: 16mm;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 4mm;
+}
+.invoice-signature-box img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-height: 12mm;
+  max-width: 100%;
+  width: auto;
+  object-fit: contain;
+  transform-origin: center center;
+}
+.invoice-signature-company {
+  font-weight: 700;
+  margin-bottom: 0.5mm;
+}
+.invoice-signer-name {
   font-weight: 700;
   text-decoration: underline;
 }
@@ -375,7 +498,8 @@ p.text-text-secondary.mt-1 {
   .letter-table tr,
   .letter-totals,
   .letter-notes,
-  .letter-signature {
+  .letter-signature,
+  .invoice-signature {
     break-inside: avoid;
     page-break-inside: avoid;
   }

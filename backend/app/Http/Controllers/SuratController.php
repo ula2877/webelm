@@ -49,6 +49,18 @@ class SuratController extends Controller
     ];
 
     /**
+     * Nomor prefix untuk jenis surat generik (selain quotation/invoice).
+     * Pola nomor: PREFIX/DDMM[urutan]/ELMECH/YYYY.
+     */
+    private const SURAT_JENIS_PREFIX = [
+        'delivery-note' => 'SJ',
+        'bast' => 'BA',
+        'inspection-request' => 'PP',
+        'payment-request' => 'PB',
+        'kuitansi' => 'KWT',
+    ];
+
+    /**
      * GET /api/surat
      * ?search=&jenis=&status=&page=&per_page=
      */
@@ -495,6 +507,574 @@ class SuratController extends Controller
             'status' => 'ok',
             'message' => 'Surat berhasil dihapus secara permanen.',
         ], 200);
+    }
+
+    /**
+     * GET /api/surat/invoice/next-number?tanggal=YYYY-MM-DD
+     * Nomor invoice berikutnya (INV/DDMM[urutan]/ELMECH/YYYY).
+     */
+    public function nextInvoiceNumber(Request $request): JsonResponse
+    {
+        $validated = $request->validate(['tanggal' => ['required', 'date']]);
+        $next = $this->maxUrutanForTanggal('invoice', 'INV', $validated['tanggal']) + 1;
+
+        return response()->json([
+            'status' => 'ok',
+            'data' => [
+                'nomor' => $this->formatSuratNomor('INV', $validated['tanggal'], $next),
+                'tanggal' => $validated['tanggal'],
+                'urutan' => $next,
+            ],
+        ], 200);
+    }
+
+    /**
+     * POST /api/surat/invoice
+     * Simpan invoice ke tb_surat (jenis='invoice') + tb_surat_item.
+     */
+    public function storeInvoice(Request $request): JsonResponse
+    {
+        return $this->saveInvoice($request, null);
+    }
+
+    /** PUT /api/surat/{id}/invoice - update invoice esisting (record sama). */
+    public function updateInvoice(Request $request, string $id): JsonResponse
+    {
+        $surat = DB::table('tb_surat')->where('id_surat', $id)->where('jenis', 'invoice')->first();
+        if (!$surat) {
+            return $this->notFound();
+        }
+
+        return $this->saveInvoice($request, $surat);
+    }
+
+    /** Core simpan/update invoice - pola storeQuotation dengan jenis='invoice'. */
+    private function saveInvoice(Request $request, ?object $existing): JsonResponse
+    {
+        $validated = $request->validate([
+            'nomor' => ['required', 'string', 'max:50'],
+            'tanggal' => ['required', 'date'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'subject' => ['required', 'string', 'max:255'],
+            'customerName' => ['required', 'string', 'max:255'],
+            'customerAddress' => ['required', 'string'],
+            'nomorPenawaran' => ['nullable', 'string', 'max:100'],
+            'nomorPo' => ['nullable', 'string', 'max:100'],
+            'usePPN' => ['sometimes', 'boolean'],
+            'ppnRate' => ['required_if:usePPN,true', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'notes' => ['nullable', 'array'],
+            'notes.*' => ['string', 'max:1000'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.nama_komponen' => ['required', 'string', 'max:500'],
+            'items.*.spesifikasi' => ['nullable'],
+            'items.*.volume' => ['required', 'numeric', 'gt:0', 'max:999999999999'],
+            'items.*.satuan' => ['required', 'string', 'in:PCS,Paket,OH,LS'],
+            'items.*.harga_satuan' => ['required', 'numeric', 'min:0', 'max:999999999999'],
+            'bankName' => ['nullable', 'string', 'max:255'],
+            'bankAccount' => ['nullable', 'string', 'max:100'],
+            'bankOwner' => ['nullable', 'string', 'max:255'],
+            'bankBranch' => ['nullable', 'string', 'max:255'],
+            'useSignature' => ['sometimes', 'boolean'],
+            'signature_asset_id' => ['nullable', 'integer'],
+            'signaturePosition' => ['nullable', 'array'],
+            'signaturePosition.x' => ['nullable', 'numeric'],
+            'signaturePosition.y' => ['nullable', 'numeric'],
+            'signaturePosition.zoom' => ['nullable', 'numeric', 'min:0.1', 'max:3'],
+            'useStamp' => ['sometimes', 'boolean'],
+            'stamp_asset_id' => ['nullable', 'integer'],
+            'stampPosition' => ['nullable', 'array'],
+            'stampPosition.x' => ['nullable', 'numeric'],
+            'stampPosition.y' => ['nullable', 'numeric'],
+            'stampPosition.zoom' => ['nullable', 'numeric', 'min:0.1', 'max:3'],
+            'signature' => ['nullable', 'array'],
+            'signature.companyName' => ['nullable', 'string', 'max:255'],
+            'signature.signerName' => ['required', 'string', 'max:255'],
+            'signature.signerTitle' => ['nullable', 'string', 'max:100'],
+            'sumberQuotationId' => ['nullable', 'integer'],
+        ], [
+            'nomor.required' => 'Nomor invoice wajib diisi.',
+            'tanggal.required' => 'Tanggal invoice wajib diisi.',
+            'subject.required' => 'Perihal invoice wajib diisi.',
+            'customerName.required' => 'Nama instansi/perusahaan wajib diisi.',
+            'customerAddress.required' => 'Alamat penerima wajib diisi.',
+            'items.required' => 'Minimal satu komponen harus ditambahkan.',
+            'items.*.nama_komponen.required' => 'Nama komponen wajib diisi.',
+            'items.*.volume.gt' => 'Volume harus lebih dari 0.',
+            'items.*.satuan.in' => 'Satuan tidak valid. Pilihan: PCS, Paket, OH, LS.',
+            'ppnRate.required_if' => 'Persentase PPN wajib diisi.',
+            'signature.signerName.required' => 'Nama penandatangan wajib diisi.',
+        ]);
+
+        $dupeQuery = DB::table('tb_surat')
+            ->where('jenis', 'invoice')
+            ->where('nomor', $validated['nomor'])
+            ->whereNull('deleted_at');
+        if ($existing) {
+            $dupeQuery->where('id_surat', '<>', $existing->id_surat);
+        }
+        if ($dupeQuery->exists()) {
+            throw ValidationException::withMessages([
+                'nomor' => ['Nomor invoice sudah digunakan pada invoice lain.'],
+            ]);
+        }
+
+        $signatureAssetId = !empty($validated['signature_asset_id']) ? (int) $validated['signature_asset_id'] : null;
+        $signatureAsset = null;
+        if ($signatureAssetId !== null) {
+            $signatureAsset = DB::table('tb_surat_asset')
+                ->where('id_asset', $signatureAssetId)
+                ->where('jenis', 'signature')
+                ->whereNull('deleted_at')
+                ->first();
+            if (!$signatureAsset) {
+                throw ValidationException::withMessages(['signature_asset_id' => ['Asset tanda tangan tidak valid.']]);
+            }
+        }
+
+        $stampAssetId = !empty($validated['stamp_asset_id']) ? (int) $validated['stamp_asset_id'] : null;
+        $stampAsset = null;
+        if ($stampAssetId !== null) {
+            $stampAsset = DB::table('tb_surat_asset')
+                ->where('id_asset', $stampAssetId)
+                ->where('jenis', 'stamp')
+                ->whereNull('deleted_at')
+                ->first();
+            if (!$stampAsset) {
+                throw ValidationException::withMessages(['stamp_asset_id' => ['Asset stempel tidak valid.']]);
+            }
+        }
+
+        $itemRows = [];
+        $total = 0;
+        foreach ($validated['items'] as $index => $item) {
+            $volume = (float) $item['volume'];
+            $harga = (float) $item['harga_satuan'];
+            $total += (int) round($volume * $harga);
+
+            $specs = $item['spesifikasi'] ?? null;
+            if (is_string($specs)) {
+                $specs = array_values(array_filter(
+                    array_map('trim', explode("\n", $specs)),
+                    fn ($line) => $line !== ''
+                ));
+            }
+            $specs = is_array($specs) ? array_values(array_map('strval', $specs)) : [];
+
+            $itemRows[] = [
+                'id_surat' => $existing ? (int) $existing->id_surat : 0,
+                'no_urut' => $index + 1,
+                'nama_komponen' => $item['nama_komponen'],
+                'spesifikasi' => $specs === [] ? null : json_encode($specs),
+                'volume' => $volume,
+                'satuan' => $item['satuan'],
+                'harga_satuan' => (int) round($harga),
+                'data' => null,
+            ];
+        }
+
+        $usePPN = !empty($validated['usePPN']);
+        $ppnRate = $usePPN ? (float) $validated['ppnRate'] : 0;
+        $ppn = (int) round($total * $ppnRate / 100);
+        $grandTotal = $total + $ppn;
+
+        $useSignature = !empty($validated['useSignature']);
+        $useStamp = !empty($validated['useStamp']);
+
+        $position = function (?array $pos): array {
+            return [
+                'x' => (float) ($pos['x'] ?? 0),
+                'y' => (float) ($pos['y'] ?? 0),
+                'zoom' => (float) ($pos['zoom'] ?? 1),
+            ];
+        };
+        $posTtd = $useSignature ? $position(is_array($validated['signaturePosition'] ?? null) ? $validated['signaturePosition'] : null) : null;
+        $posStempel = $useStamp ? $position(is_array($validated['stampPosition'] ?? null) ? $validated['stampPosition'] : null) : null;
+
+        $signatureBlock = is_array($validated['signature'] ?? null) ? $validated['signature'] : [];
+
+        $dataJson = [
+            'city' => $validated['city'] ?? null,
+            'subject' => $validated['subject'],
+            'customerName' => $validated['customerName'],
+            'customerAddress' => $validated['customerAddress'],
+            'nomorPenawaran' => $validated['nomorPenawaran'] ?? null,
+            'nomorPo' => $validated['nomorPo'] ?? null,
+            'sumberQuotationId' => !empty($validated['sumberQuotationId']) ? (int) $validated['sumberQuotationId'] : null,
+            'usePPN' => $usePPN,
+            'ppnRate' => $usePPN ? $ppnRate : 0,
+            'useSignatureStamp' => ($useSignature || $useStamp),
+            'useSignature' => $useSignature,
+            'useStamp' => $useStamp,
+            'signatureImage' => $signatureAsset ? $signatureAsset->path : null,
+            'stampImage' => $stampAsset ? $stampAsset->path : null,
+            'signaturePosition' => $posTtd,
+            'stampPosition' => $posStempel,
+            'signature' => [
+                'companyName' => (string) ($signatureBlock['companyName'] ?? ''),
+                'signerName' => (string) ($signatureBlock['signerName'] ?? ''),
+                'signerTitle' => (string) ($signatureBlock['signerTitle'] ?? ''),
+            ],
+            'bank' => [
+                'bankName' => (string) ($validated['bankName'] ?? ''),
+                'bankAccount' => (string) ($validated['bankAccount'] ?? ''),
+                'bankOwner' => (string) ($validated['bankOwner'] ?? ''),
+                'bankBranch' => (string) ($validated['bankBranch'] ?? ''),
+            ],
+            'notes' => array_values(array_filter(
+                array_map('strval', $validated['notes'] ?? []),
+                fn ($n) => trim($n) !== ''
+            )),
+            'totals' => [
+                'total' => $total,
+                'ppn' => $ppn,
+                'ppnRate' => $usePPN ? $ppnRate : 0,
+                'grandTotal' => $grandTotal,
+            ],
+        ];
+
+        try {
+            $idSurat = DB::transaction(function () use ($existing, $validated, $grandTotal, $dataJson, $signatureAssetId, $stampAssetId, $useSignature, $useStamp, $posTtd, $posStempel, $itemRows) {
+                if ($existing) {
+                    $id = (int) $existing->id_surat;
+                    DB::table('tb_surat')->where('id_surat', $id)->update([
+                        'nomor' => $validated['nomor'],
+                        'tanggal' => $validated['tanggal'],
+                        'total' => $grandTotal,
+                        'data' => json_encode($dataJson),
+                        'updated_at' => now(),
+                        'id_asset_ttd' => $signatureAssetId,
+                        'id_asset_stempel' => $stampAssetId,
+                        'use_signature_stamp' => ($useSignature || $useStamp) ? 1 : 0,
+                        'posisi_ttd' => $posTtd !== null ? json_encode($posTtd) : null,
+                        'posisi_stempel' => $posStempel !== null ? json_encode($posStempel) : null,
+                    ]);
+                    DB::table('tb_surat_item')->where('id_surat', $id)->delete();
+                } else {
+                    $user = Auth::user();
+                    $uuid = '';
+                    do {
+                        $uuid = 'INV-' . strtoupper(bin2hex(random_bytes(5)));
+                    } while (DB::table('tb_surat')->where('uuid_surat', $uuid)->exists());
+
+                    $id = DB::table('tb_surat')->insertGetId([
+                        'uuid_surat' => $uuid,
+                        'jenis' => 'invoice',
+                        'nomor' => $validated['nomor'],
+                        'tanggal' => $validated['tanggal'],
+                        'created_by' => $user->id_user,
+                        'total' => $grandTotal,
+                        'data' => json_encode($dataJson),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                        'id_asset_ttd' => $signatureAssetId,
+                        'id_asset_stempel' => $stampAssetId,
+                        'use_signature_stamp' => ($useSignature || $useStamp) ? 1 : 0,
+                        'posisi_ttd' => $posTtd !== null ? json_encode($posTtd) : null,
+                        'posisi_stempel' => $posStempel !== null ? json_encode($posStempel) : null,
+                    ]);
+                }
+
+                foreach ($itemRows as &$itemRow) {
+                    $itemRow['id_surat'] = $id;
+                    DB::table('tb_surat_item')->insert($itemRow);
+                }
+
+                return $id;
+            });
+        } catch (QueryException $e) {
+            Log::error('Gagal menyimpan invoice', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal menyimpan invoice. Silakan coba lagi.',
+            ], 500);
+        }
+
+        return response()->json([
+            'status' => 'ok',
+            'message' => $existing ? 'Invoice berhasil diperbarui.' : 'Invoice berhasil disimpan.',
+            'data' => [
+                'id' => (int) $idSurat,
+                'nomor' => $validated['nomor'],
+                'tanggal' => $validated['tanggal'],
+                'total' => $grandTotal,
+                'jumlah_item' => count($itemRows),
+            ],
+        ], $existing ? 200 : 201);
+    }
+
+    /**
+     * GET /api/surat/{jenis}/next-number?tanggal=YYYY-MM-DD
+     *
+     * Nomor berikutnya untuk jenis surat generik
+     * (delivery-note, bast, inspection-request, payment-request,
+     * kuitansi). Pola: PREFIX/DDMM[urutan]/ELMECH/YYYY,
+     * dihitung dari tb_surat aktif (deleted_at IS NULL) -
+     * bukan dari counter frontend.
+     */
+    public function nextSuratJenisNumber(Request $request, string $jenis): JsonResponse
+    {
+        if (!isset(self::SURAT_JENIS_PREFIX[$jenis])) {
+            throw ValidationException::withMessages([
+                'jenis' => ['Jenis surat tidak valid.'],
+            ]);
+        }
+
+        $validated = $request->validate([
+            'tanggal' => ['required', 'date'],
+        ]);
+
+        $prefix = self::SURAT_JENIS_PREFIX[$jenis];
+        $next = $this->maxUrutanForTanggal($jenis, $prefix, $validated['tanggal']) + 1;
+
+        return response()->json([
+            'status' => 'ok',
+            'data' => [
+                'nomor' => $this->formatSuratNomor($prefix, $validated['tanggal'], $next),
+                'tanggal' => $validated['tanggal'],
+                'urutan' => $next,
+            ],
+        ], 200);
+    }
+
+    /**
+     * POST /api/surat/{jenis}
+     * Simpan surat generik ke tb_surat (jenis sesuai URL)
+     * + tb_surat_item. Tanpa migration / tabel baru.
+     */
+    public function storeSuratJenis(Request $request, string $jenis): JsonResponse
+    {
+        return $this->saveSuratJenis($request, $jenis, null);
+    }
+
+    /**
+     * PUT /api/surat/{id}/{jenis}
+     * UPDATE record tb_surat yang SAMA (tidak INSERT baru).
+     */
+    public function updateSuratJenis(Request $request, string $id, string $jenis): JsonResponse
+    {
+        $surat = DB::table('tb_surat')->where('id_surat', $id)->where('jenis', $jenis)->first();
+        if (!$surat) {
+            return $this->notFound();
+        }
+
+        return $this->saveSuratJenis($request, $jenis, $surat);
+    }
+
+    /**
+     * Core simpan/update surat generik - pola saveQuotation/saveInvoice
+     * tanpa PPN/DP/bank (tidak dipakai jenis surat ini).
+     */
+    private function saveSuratJenis(Request $request, string $jenis, ?object $existing): JsonResponse
+    {
+        if (!isset(self::SURAT_JENIS_PREFIX[$jenis])) {
+            throw ValidationException::withMessages([
+                'jenis' => ['Jenis surat tidak valid.'],
+            ]);
+        }
+
+        $validated = $request->validate([
+            'nomor' => ['required', 'string', 'max:50'],
+            'tanggal' => ['required', 'date'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'subject' => ['required', 'string', 'max:255'],
+            'customerName' => ['required', 'string', 'max:255'],
+            'customerAddress' => ['required', 'string'],
+            'notes' => ['nullable', 'array'],
+            'notes.*' => ['string', 'max:1000'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.nama_komponen' => ['required', 'string', 'max:500'],
+            'items.*.spesifikasi' => ['nullable'],
+            'items.*.volume' => ['required', 'numeric', 'gt:0', 'max:999999999999'],
+            'items.*.satuan' => ['required', 'string', 'in:PCS,Paket,OH,LS'],
+            'items.*.harga_satuan' => ['required', 'numeric', 'min:0', 'max:999999999999'],
+            'useSignature' => ['sometimes', 'boolean'],
+            'signature_asset_id' => ['nullable', 'integer'],
+            'signaturePosition' => ['nullable', 'array'],
+            'signaturePosition.x' => ['nullable', 'numeric'],
+            'signaturePosition.y' => ['nullable', 'numeric'],
+            'signaturePosition.zoom' => ['nullable', 'numeric', 'min:0.1', 'max:3'],
+            'signature' => ['nullable', 'array'],
+            'signature.companyName' => ['nullable', 'string', 'max:255'],
+            'signature.signerName' => ['required', 'string', 'max:255'],
+            'signature.signerTitle' => ['nullable', 'string', 'max:100'],
+        ], [
+            'nomor.required' => 'Nomor surat wajib diisi.',
+            'tanggal.required' => 'Tanggal surat wajib diisi.',
+            'subject.required' => 'Perihal surat wajib diisi.',
+            'customerName.required' => 'Nama instansi/perusahaan wajib diisi.',
+            'customerAddress.required' => 'Alamat penerima wajib diisi.',
+            'items.required' => 'Minimal satu komponen harus ditambahkan.',
+            'items.*.nama_komponen.required' => 'Nama komponen wajib diisi.',
+            'items.*.volume.gt' => 'Volume harus lebih dari 0.',
+            'items.*.satuan.in' => 'Satuan tidak valid. Pilihan: PCS, Paket, OH, LS.',
+            'signature.signerName.required' => 'Nama penandatangan wajib diisi.',
+        ]);
+
+        // Nomor unik per jenis (surat aktif saja).
+        $dupeQuery = DB::table('tb_surat')
+            ->where('jenis', $jenis)
+            ->where('nomor', $validated['nomor'])
+            ->whereNull('deleted_at');
+        if ($existing) {
+            $dupeQuery->where('id_surat', '<>', $existing->id_surat);
+        }
+        if ($dupeQuery->exists()) {
+            throw ValidationException::withMessages([
+                'nomor' => ['Nomor surat sudah digunakan pada surat lain.'],
+            ]);
+        }
+
+        $signatureAssetId = !empty($validated['signature_asset_id']) ? (int) $validated['signature_asset_id'] : null;
+        $signatureAsset = null;
+        if ($signatureAssetId !== null) {
+            $signatureAsset = DB::table('tb_surat_asset')
+                ->where('id_asset', $signatureAssetId)
+                ->where('jenis', 'signature')
+                ->whereNull('deleted_at')
+                ->first();
+            if (!$signatureAsset) {
+                throw ValidationException::withMessages([
+                    'signature_asset_id' => ['Asset tanda tangan tidak valid.'],
+                ]);
+            }
+        }
+
+        $itemRows = [];
+        $total = 0;
+        foreach ($validated['items'] as $index => $item) {
+            $volume = (float) $item['volume'];
+            $harga = (float) $item['harga_satuan'];
+            $total += (int) round($volume * $harga);
+
+            $specs = $item['spesifikasi'] ?? null;
+            if (is_string($specs)) {
+                $specs = array_values(array_filter(
+                    array_map('trim', explode("\n", $specs)),
+                    fn ($line) => $line !== ''
+                ));
+            }
+            $specs = is_array($specs) ? array_values(array_map('strval', $specs)) : [];
+
+            $itemRows[] = [
+                'id_surat' => $existing ? (int) $existing->id_surat : 0,
+                'no_urut' => $index + 1,
+                'nama_komponen' => $item['nama_komponen'],
+                'spesifikasi' => $specs === [] ? null : json_encode($specs),
+                'volume' => $volume,
+                'satuan' => $item['satuan'],
+                'harga_satuan' => (int) round($harga),
+                'data' => null,
+            ];
+        }
+
+        $useSignature = !empty($validated['useSignature']);
+
+        $position = function (?array $pos): array {
+            return [
+                'x' => (float) ($pos['x'] ?? 0),
+                'y' => (float) ($pos['y'] ?? 0),
+                'zoom' => (float) ($pos['zoom'] ?? 1),
+            ];
+        };
+        $posTtd = $useSignature
+            ? $position(is_array($validated['signaturePosition'] ?? null) ? $validated['signaturePosition'] : null)
+            : null;
+
+        $signatureBlock = is_array($validated['signature'] ?? null) ? $validated['signature'] : [];
+
+        $dataJson = [
+            'city' => $validated['city'] ?? null,
+            'subject' => $validated['subject'],
+            'customerName' => $validated['customerName'],
+            'customerAddress' => $validated['customerAddress'],
+            'useSignature' => $useSignature,
+            'useSignatureStamp' => $useSignature,
+            'signatureImage' => $signatureAsset ? $signatureAsset->path : null,
+            'signaturePosition' => $posTtd,
+            'signature' => [
+                'companyName' => (string) ($signatureBlock['companyName'] ?? ''),
+                'signerName' => (string) ($signatureBlock['signerName'] ?? ''),
+                'signerTitle' => (string) ($signatureBlock['signerTitle'] ?? ''),
+            ],
+            'notes' => array_values(array_filter(
+                array_map('strval', $validated['notes'] ?? []),
+                fn ($n) => trim($n) !== ''
+            )),
+            'totals' => [
+                'total' => $total,
+            ],
+        ];
+
+        try {
+            $idSurat = DB::transaction(function () use ($existing, $validated, $total, $dataJson, $signatureAssetId, $useSignature, $posTtd, $itemRows, $jenis) {
+                if ($existing) {
+                    $id = (int) $existing->id_surat;
+                    DB::table('tb_surat')->where('id_surat', $id)->update([
+                        'nomor' => $validated['nomor'],
+                        'tanggal' => $validated['tanggal'],
+                        'total' => $total,
+                        'data' => json_encode($dataJson),
+                        'updated_at' => now(),
+                        'id_asset_ttd' => $signatureAssetId,
+                        'use_signature_stamp' => $useSignature ? 1 : 0,
+                        'posisi_ttd' => $posTtd !== null ? json_encode($posTtd) : null,
+                    ]);
+                    DB::table('tb_surat_item')->where('id_surat', $id)->delete();
+                } else {
+                    // created_by selalu dari user yang login, bukan input client.
+                    $user = Auth::user();
+                    $code = self::SURAT_JENIS_PREFIX[$jenis];
+                    $uuid = '';
+                    do {
+                        $uuid = $code . '-' . strtoupper(bin2hex(random_bytes(5)));
+                    } while (DB::table('tb_surat')->where('uuid_surat', $uuid)->exists());
+
+                    $id = DB::table('tb_surat')->insertGetId([
+                        'uuid_surat' => $uuid,
+                        'jenis' => $jenis,
+                        'nomor' => $validated['nomor'],
+                        'tanggal' => $validated['tanggal'],
+                        'created_by' => $user->id_user,
+                        'total' => $total,
+                        'data' => json_encode($dataJson),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                        'id_asset_ttd' => $signatureAssetId,
+                        'id_asset_stempel' => null,
+                        'use_signature_stamp' => $useSignature ? 1 : 0,
+                        'posisi_ttd' => $posTtd !== null ? json_encode($posTtd) : null,
+                        'posisi_stempel' => null,
+                    ]);
+                }
+
+                foreach ($itemRows as &$itemRow) {
+                    $itemRow['id_surat'] = $id;
+                    DB::table('tb_surat_item')->insert($itemRow);
+                }
+
+                return $id;
+            });
+        } catch (QueryException $e) {
+            Log::error('Gagal menyimpan surat', ['error' => $e->getMessage(), 'jenis' => $jenis]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal menyimpan surat. Silakan coba lagi.',
+            ], 500);
+        }
+
+        return response()->json([
+            'status' => 'ok',
+            'message' => $existing ? 'Surat berhasil diperbarui.' : 'Surat berhasil disimpan.',
+            'data' => [
+                'id' => (int) $idSurat,
+                'nomor' => $validated['nomor'],
+                'tanggal' => $validated['tanggal'],
+                'total' => $total,
+                'jumlah_item' => count($itemRows),
+            ],
+        ], $existing ? 200 : 201);
     }
 
     /**
@@ -1008,19 +1588,25 @@ class SuratController extends Controller
      */
     private function maxQuotationUrutanForTanggal(string $tanggal): int
     {
+        return $this->maxUrutanForTanggal('quotation', 'PNR', $tanggal);
+    }
+
+    /** Generic: urutan terbesar surat AKTIF suatu jenis pada tanggal tsb. */
+    private function maxUrutanForTanggal(string $jenis, string $prefix, string $tanggal): int
+    {
         $ts = strtotime($tanggal);
         $dd = date('d', $ts);
         $mm = date('m', $ts);
 
         $nomors = DB::table('tb_surat')
-            ->where('jenis', 'quotation')
+            ->where('jenis', $jenis)
             ->where('tanggal', $tanggal)
             ->whereNull('deleted_at')
             ->pluck('nomor');
 
         $max = 0;
         foreach ($nomors as $nomor) {
-            if (preg_match('/^PNR\/(\d{2})(\d{2})(\d+)\/ELMECH\/\d{4}$/', (string) $nomor, $m)
+            if (preg_match('/^' . preg_quote($prefix, '/') . '\/(\d{2})(\d{2})(\d+)\/ELMECH\/\d{4}$/', (string) $nomor, $m)
                 && $m[1] === $dd && $m[2] === $mm) {
                 $max = max($max, (int) $m[3]);
             }
@@ -1032,9 +1618,14 @@ class SuratController extends Controller
     /** "PNR/DDMM[urutan]/ELMECH/YYYY" - mengikuti contoh existing. */
     private function formatQuotationNomor(string $tanggal, int $urutan): string
     {
+        return $this->formatSuratNomor('PNR', $tanggal, $urutan);
+    }
+
+    private function formatSuratNomor(string $prefix, string $tanggal, int $urutan): string
+    {
         $ts = strtotime($tanggal);
 
-        return sprintf('PNR/%s%s%d/ELMECH/%s', date('d', $ts), date('m', $ts), $urutan, date('Y', $ts));
+        return sprintf('%s/%s%s%d/ELMECH/%s', $prefix, date('d', $ts), date('m', $ts), $urutan, date('Y', $ts));
     }
 
     /**

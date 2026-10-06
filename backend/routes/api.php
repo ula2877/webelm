@@ -74,6 +74,23 @@ Route::middleware('auth')->group(function () {
     Route::put('/surat/{id}/quotation', [SuratController::class, 'updateQuotation'])
         ->where('id', '[0-9]+');
 
+    // Invoice - pola yang sama, jenis='invoice'.
+    Route::get('/surat/invoice/next-number', [SuratController::class, 'nextInvoiceNumber']);
+    Route::post('/surat/invoice', [SuratController::class, 'storeInvoice']);
+    Route::put('/surat/{id}/invoice', [SuratController::class, 'updateInvoice'])
+        ->where('id', '[0-9]+');
+
+    // Surat generik (Surat Jalan, BAST, Surat Permohonan Pemeriksaan,
+    // Surat Permohonan Pembayaran, Kuitansi) - pola yang sama,
+    // tersimpan di tb_surat dengan jenis sesuai URL.
+    Route::get('/surat/{jenis}/next-number', [SuratController::class, 'nextSuratJenisNumber'])
+        ->where('jenis', 'delivery-note|bast|inspection-request|payment-request|kuitansi');
+    Route::post('/surat/{jenis}', [SuratController::class, 'storeSuratJenis'])
+        ->where('jenis', 'delivery-note|bast|inspection-request|payment-request|kuitansi');
+    Route::put('/surat/{id}/{jenis}', [SuratController::class, 'updateSuratJenis'])
+        ->where('id', '[0-9]+')
+        ->where('jenis', 'delivery-note|bast|inspection-request|payment-request|kuitansi');
+
     // Surat assets (signature / stamp) - operates on the existing tb_surat_asset
     // table. Files go to the public disk; the absolute URL is stored in `path`.
     Route::get('/surat-assets', [SuratAssetController::class, 'index']);

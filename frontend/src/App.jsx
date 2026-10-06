@@ -11,11 +11,23 @@ import SuratQuotation from './pages/SuratQuotation';
 import CreateSuratQuotation from './pages/CreateSuratQuotation';
 import ViewSuratQuotation from './pages/ViewSuratQuotation';
 import SuratInvoice from './pages/SuratInvoice';
+import CreateSuratInvoice from './pages/CreateSuratInvoice';
+import ViewSuratInvoice from './pages/ViewSuratInvoice';
 import SuratDeliveryNote from './pages/SuratDeliveryNote';
+import CreateSuratDeliveryNote from './pages/CreateSuratDeliveryNote';
+import ViewSuratDeliveryNote from './pages/ViewSuratDeliveryNote';
 import SuratHandover from './pages/SuratHandover';
+import CreateSuratHandover from './pages/CreateSuratHandover';
+import ViewSuratHandover from './pages/ViewSuratHandover';
 import SuratInspectionRequest from './pages/SuratInspectionRequest';
+import CreateSuratInspectionRequest from './pages/CreateSuratInspectionRequest';
+import ViewSuratInspectionRequest from './pages/ViewSuratInspectionRequest';
 import SuratPaymentRequest from './pages/SuratPaymentRequest';
+import CreateSuratPaymentRequest from './pages/CreateSuratPaymentRequest';
+import ViewSuratPaymentRequest from './pages/ViewSuratPaymentRequest';
 import SuratReceipt from './pages/SuratReceipt';
+import CreateSuratReceipt from './pages/CreateSuratReceipt';
+import ViewSuratReceipt from './pages/ViewSuratReceipt';
 import Profile from './pages/Profile';
 
 function LoadingScreen() {
@@ -86,11 +98,29 @@ function AppRoutes() {
         <Route path="/letters/quotation/:id/edit" element={<CreateSuratQuotation />} />
         <Route path="/letters/quotation/:id/view" element={<ViewSuratQuotation />} />
         <Route path="/letters/invoice" element={<SuratInvoice />} />
+        <Route path="/letters/invoice/create" element={<CreateSuratInvoice />} />
+        <Route path="/letters/invoice/:id/edit" element={<CreateSuratInvoice />} />
+        <Route path="/letters/invoice/:id/view" element={<ViewSuratInvoice />} />
         <Route path="/letters/delivery-note" element={<SuratDeliveryNote />} />
+        <Route path="/letters/delivery-note/create" element={<CreateSuratDeliveryNote />} />
+        <Route path="/letters/delivery-note/:id/edit" element={<CreateSuratDeliveryNote />} />
+        <Route path="/letters/delivery-note/:id/view" element={<ViewSuratDeliveryNote />} />
         <Route path="/letters/handover" element={<SuratHandover />} />
+        <Route path="/letters/handover/create" element={<CreateSuratHandover />} />
+        <Route path="/letters/handover/:id/edit" element={<CreateSuratHandover />} />
+        <Route path="/letters/handover/:id/view" element={<ViewSuratHandover />} />
         <Route path="/letters/inspection-request" element={<SuratInspectionRequest />} />
+        <Route path="/letters/inspection-request/create" element={<CreateSuratInspectionRequest />} />
+        <Route path="/letters/inspection-request/:id/edit" element={<CreateSuratInspectionRequest />} />
+        <Route path="/letters/inspection-request/:id/view" element={<ViewSuratInspectionRequest />} />
         <Route path="/letters/payment-request" element={<SuratPaymentRequest />} />
+        <Route path="/letters/payment-request/create" element={<CreateSuratPaymentRequest />} />
+        <Route path="/letters/payment-request/:id/edit" element={<CreateSuratPaymentRequest />} />
+        <Route path="/letters/payment-request/:id/view" element={<ViewSuratPaymentRequest />} />
         <Route path="/letters/receipt" element={<SuratReceipt />} />
+        <Route path="/letters/receipt/create" element={<CreateSuratReceipt />} />
+        <Route path="/letters/receipt/:id/edit" element={<CreateSuratReceipt />} />
+        <Route path="/letters/receipt/:id/view" element={<ViewSuratReceipt />} />
         <Route path="/profile" element={<Profile />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

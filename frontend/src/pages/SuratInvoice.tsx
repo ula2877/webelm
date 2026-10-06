@@ -1,5 +1,5 @@
-import SuratJenisPage from './SuratJenisPage';
+import SuratInvoiceList from './SuratInvoice';
 
 export default function SuratInvoice() {
-  return <SuratJenisPage jenisKey="invoice" jenisLabel="Invoice" createLabel="Buat Invoice" />;
+  return <SuratInvoiceList />;
 }

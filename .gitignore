@@ -1,0 +1,18 @@
+# Laravel sessions & cache
+backend/storage/framework/sessions/
+backend/.phpunit.result.cache
+
+# Dependencies
+node_modules/
+vendor/
+
+# Environment
+.env
+.env.backup
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
