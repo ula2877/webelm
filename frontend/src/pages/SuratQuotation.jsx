@@ -1,14 +1,16 @@
-import { FileText, Plus, Search, Filter, RotateCcw, Eye, Edit2, Trash2, Loader2 } from 'lucide-react';
+import { FileText, Plus, Search, RotateCcw, Eye, Edit2, Trash2, Loader2, FileDown } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import Input, { Select } from '../components/ui/Input';
-import Badge from '../components/ui/Badge';
 import Pagination from '../components/ui/Pagination';
 import EmptyState from '../components/ui/EmptyState';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import QuotationPreview from '../components/QuotationPreview';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as suratService from '../services/surat';
 import { formatDate } from '../utils/helpers';
+import { formFromQuotationDetail } from '../utils/quotation';
+import { buildPreviewHtml } from '../utils/quotationPrintHtml';
 
 const ITEMS_PER_PAGE = 6;
 const JENIS_FILTER = 'quotation';
@@ -18,12 +20,17 @@ export default function SuratQuotation() {
   const [surat, setSurat] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [notice, setNotice] = useState(null);
+  // Download PDF per-row: fetch detail -> render offscreen preview -> serialize
+  const [pdfForm, setPdfForm] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
+  // Delete
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, item: null });
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   // Ref for search input to maintain focus
   const searchInputRef = useRef(null);
@@ -52,7 +59,6 @@ export default function SuratQuotation() {
       const response = await suratService.fetchSurat({
         search: debouncedSearchQuery,
         jenis: JENIS_FILTER,
-        status: statusFilter,
         page: currentPage,
         perPage: ITEMS_PER_PAGE,
       });
@@ -72,7 +78,7 @@ export default function SuratQuotation() {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearchQuery, statusFilter, currentPage]);
+  }, [debouncedSearchQuery, currentPage]);
 
   useEffect(() => {
     fetchSuratData();
@@ -82,12 +88,87 @@ export default function SuratQuotation() {
   const handleResetFilter = () => {
     setSearchQuery('');
     setDebouncedSearchQuery('');
-    setStatusFilter('');
     setCurrentPage(1);
     // Focus search input after state updates
     setTimeout(() => {
       searchInputRef.current?.focus();
     }, 0);
+  };
+
+  // ---- Download PDF dari list: ambil detail, lalu render preview
+  // offscreen agar HTML yang dipakai IDENTIK dengan preview Create/Edit.
+  const handleDownloadPdf = async (s) => {
+    if (downloadingId) return;
+    setDownloadingId(s.id);
+    try {
+      const res = await suratService.fetchQuotationDetail(s.id);
+      if (res?.status !== 'ok' || !res.data) {
+        showNoticeRef.current('error', 'Gagal mengambil data surat.');
+        return;
+      }
+      setPdfForm({ id: s.id, form: formFromQuotationDetail(res.data), nomor: res.data.nomor });
+    } catch (err) {
+      showNoticeRef.current('error', err.message || 'Gagal membuat PDF surat.');
+      setDownloadingId(null);
+    }
+  };
+
+  // Saat preview offscreen sudah dirender, tunggu layout+fonts lalu serialize.
+  useEffect(() => {
+    if (!pdfForm) return undefined;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        await document.fonts?.ready;
+        // beri waktu QuotationPreview mengukur halaman (useLayoutEffect)
+        await new Promise((r) => setTimeout(r, 600));
+        if (cancelled) return;
+        const html = await buildPreviewHtml();
+        const blob = await suratService.downloadQuotationPdfFromHtml(html);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const nomor = (pdfForm.nomor || 'surat').replace(/[\\/:*?"<>|]+/g, '_');
+        a.download = `Surat-Penawaran-${nomor}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        if (!cancelled) showNoticeRef.current('error', err.message || 'Gagal membuat PDF surat.');
+      } finally {
+        if (!cancelled) {
+          setPdfForm(null);
+          setDownloadingId(null);
+        }
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [pdfForm]);
+
+  // ---- Delete surat (soft delete via deleted_at) ----
+  const handleDeleteConfirm = async () => {
+    const item = deleteConfirm.item;
+    if (!item || deleteBusy) return;
+    setDeleteBusy(true);
+    try {
+      const res = await suratService.deleteSurat(item.id);
+      setDeleteConfirm({ isOpen: false, item: null });
+      if (res?.status === 'ok') {
+        showNoticeRef.current('success', 'Surat berhasil dihapus secara permanen.');
+        // refresh list (pagination akan dikoreksi fetchSuratData bila kosong)
+        fetchSuratData();
+      } else {
+        showNoticeRef.current('error', res?.message || 'Gagal menghapus surat. Silakan coba lagi.');
+      }
+    } catch (err) {
+      showNoticeRef.current('error', err.message || 'Gagal menghapus surat. Silakan coba lagi.');
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
   return (
@@ -153,16 +234,6 @@ export default function SuratQuotation() {
             </div>
           </div>
           <div className="flex gap-3">
-            <Select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-              className="w-40"
-              disabled={isLoading}
-            >
-              <option value="">Semua Status</option>
-              <option value="Dibaca">Dibaca</option>
-              <option value="Belum Dibaca">Belum Dibaca</option>
-            </Select>
             <Button
               variant="secondary"
               icon={RotateCcw}
@@ -198,7 +269,6 @@ export default function SuratQuotation() {
                     <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Perihal</th>
                     <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Pengirim</th>
                     <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Tanggal</th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Status</th>
                     <th className="text-right py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Aksi</th>
                   </tr>
                 </thead>
@@ -210,17 +280,26 @@ export default function SuratQuotation() {
                       <td className="py-4 px-6 text-sm text-text-secondary">{s.pengirim}</td>
                       <td className="py-4 px-6 text-sm text-text-secondary">{s.tanggal}</td>
                       <td className="py-4 px-6">
-                        <Badge variant={s.status_variant} dot>{s.status}</Badge>
-                      </td>
-                      <td className="py-4 px-6">
                         <div className="flex items-center justify-end gap-1">
-                          <button className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors" title="Lihat">
+                          <button className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors" title="Lihat" onClick={() => navigate(`/letters/quotation/${s.id}/view`)}>
                             <Eye className="w-4 h-4" />
                           </button>
-                          <button className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors" title="Edit">
+                          <button className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors" title="Edit" onClick={() => navigate(`/letters/quotation/${s.id}/edit`)}>
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button className="p-2 rounded-lg text-text-muted hover:text-red-600 hover:bg-red-50 transition-colors" title="Hapus">
+                          <button
+                            className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Download PDF"
+                            disabled={downloadingId !== null}
+                            onClick={() => handleDownloadPdf(s)}
+                          >
+                            {downloadingId === s.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <FileDown className="w-4 h-4" />
+                            )}
+                          </button>
+                          <button className="p-2 rounded-lg text-text-muted hover:text-red-600 hover:bg-red-50 transition-colors" title="Hapus" onClick={() => setDeleteConfirm({ isOpen: true, item: s })}>
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -242,6 +321,23 @@ export default function SuratQuotation() {
           </>
         )}
       </Card>
+      {/* Offscreen preview untuk generate PDF langsung dari list */}
+      {pdfForm && (
+        <div style={{ position: 'absolute', left: -10000, top: 0 }} aria-hidden="true">
+          <QuotationPreview form={pdfForm.form} />
+        </div>
+      )}
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, item: null })}
+        onConfirm={handleDeleteConfirm}
+        title="Hapus Surat Penawaran?"
+        message={`Apakah Anda yakin ingin menghapus surat ${deleteConfirm.item?.nomor || ''}?\nSurat akan dihapus secara permanen dan tidak dapat dipulihkan.`}
+        confirmLabel="Hapus Permanen"
+        cancelLabel="Batal"
+        loading={deleteBusy}
+      />
     </div>
   );
 }

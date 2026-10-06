@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
-  Save,
   FileDown,
   Plus,
   Minus,
@@ -16,18 +15,19 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input, { Textarea, Select } from '../components/ui/Input';
 import QuotationPreview from '../components/QuotationPreview';
+import { buildPreviewHtml } from '../utils/quotationPrintHtml';
 import { cn } from '../utils/helpers';
 import * as suratService from '../services/surat';
 import {
   createInitialForm,
   emptyItem,
-  formatNomorSurat,
   validateQuotation,
   buildQuotationPayload,
   computeItemSubtotal,
   buildQuotationTotals,
   validateImageFile,
   rupiah,
+  formFromQuotationDetail,
 } from '../utils/quotation';
 
 const SECTION_HEADING = 'text-base font-semibold text-text-primary';
@@ -289,6 +289,10 @@ function ImageAssetField({
 
 export default function CreateSuratQuotation() {
   const navigate = useNavigate();
+  const { id: editId } = useParams();
+  const isEditMode = Boolean(editId);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(isEditMode);
+  const [loadError, setLoadError] = useState(null);
   const [form, setForm] = useState(createInitialForm);
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState(null);
@@ -384,18 +388,68 @@ export default function CreateSuratQuotation() {
     setForm((prev) => ({ ...prev, [name]: value }));
   }, []);
 
-  // Keep the nomor in sync with the tanggal year unless the user edited it manually.
+  // Tanggal dipilih user -> nomor surat otomatis mengikuti tanggal
+  // (dihitung oleh backend dari data aktif tb_surat).
   const handleTanggalChange = (value) => {
-    setForm((prev) => {
-      const autoNomor = formatNomorSurat(1101, prev.tanggal);
-      const shouldSync = !prev.nomor || prev.nomor === autoNomor;
-      return {
-        ...prev,
-        tanggal: value,
-        nomor: shouldSync ? formatNomorSurat(1101, value) : prev.nomor,
-      };
-    });
+    setForm((prev) => ({ ...prev, tanggal: value }));
   };
+
+  // Generate nomor otomatis setiap tanggal berubah (termasuk saat pertama
+  // dibuka). HANYA di mode create - mode edit memakai nomor tersimpan.
+  useEffect(() => {
+    if (isEditMode) return undefined;
+    let cancelled = false;
+    if (!form.tanggal) {
+      setField('nomor', '');
+      return undefined;
+    }
+    suratService
+      .fetchNextQuotationNumber(form.tanggal)
+      .then((res) => {
+        if (!cancelled && res?.status === 'ok') {
+          setForm((prev) => ({ ...prev, nomor: res.data.nomor }));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setForm((prev) => ({ ...prev, nomor: '' }));
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.tanggal, isEditMode]);
+
+  // ---- Mode EDIT: muat data surat tersimpan ke form ----
+  useEffect(() => {
+    if (!isEditMode) return undefined;
+    let cancelled = false;
+    setIsLoadingDetail(true);
+    setLoadError(null);
+    suratService
+      .fetchQuotationDetail(editId)
+      .then((res) => {
+        if (cancelled) return;
+        if (res?.status !== 'ok' || !res.data) {
+          setLoadError('Surat tidak ditemukan.');
+          return;
+        }
+        const s = res.data;
+        setAssetIds({
+          signature: s.id_asset_ttd ?? null,
+          stamp: s.id_asset_stempel ?? null,
+        });
+        setForm((prev) => ({ ...prev, ...formFromQuotationDetail(s) }));
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(err.message || 'Gagal memuat data surat.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingDetail(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isEditMode, editId]);
 
   // ------------------------------------------------- signature / stamp images
   // Files are uploaded to the server (recorded in tb_surat_asset). The stored
@@ -519,53 +573,38 @@ export default function CreateSuratQuotation() {
     return true;
   };
 
-  // SIMPAN: validasi -> POST /api/surat/quotation -> tb_surat.
-  // Tidak download PDF. User tetap di halaman ini.
-  const handleSave = async () => {
-    if (isSubmitting || !validateForm()) return;
-    setIsSubmitting(true);
-    try {
-      const payload = buildQuotationPayload(form, assetIds);
-      const res = await suratService.saveQuotation(payload);
-      if (res.status === 'ok') {
-        setSavedSurat(res.data);
-        showNotice('success', res.message || 'Surat penawaran berhasil disimpan.');
-      } else {
-        showNotice('error', res.message || 'Gagal menyimpan surat. Silakan coba lagi.');
-      }
-    } catch (err) {
-      showNotice('error', err.message || 'Gagal menyimpan surat. Silakan coba lagi.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // SIMPAN & DOWNLOAD PDF: urutan WAJIB save -> berhasil -> generate PDF ->
-  // download. Jika save gagal, PDF tidak dibuat/diunduh.
+  // SIMPAN & DOWNLOAD PDF: validasi -> simpan -> generate PDF -> download.
+  // Jika simpan/validasi gagal, PDF tidak dibuat.
   const handleSaveAndDownload = async () => {
     if (isSubmitting || !validateForm()) return;
     setIsSubmitting(true);
     try {
       const payload = buildQuotationPayload(form, assetIds);
-      const res = await suratService.saveQuotation(payload);
-      if (res.status !== 'ok' || !res.data?.id) {
+      // CREATE -> INSERT baru, EDIT -> UPDATE record yang sama.
+      const res = isEditMode
+        ? await suratService.updateQuotation(editId, payload)
+        : await suratService.saveQuotation(payload);
+      if (res.status !== 'ok' || (!isEditMode && !res.data?.id)) {
         showNotice('error', res.message || 'Gagal menyimpan surat. Silakan coba lagi.');
         return;
       }
       setSavedSurat(res.data);
 
       // Baru setelah data tersimpan: generate + download PDF.
-      const blob = await suratService.downloadQuotationPdf(res.data.id);
+      // PDF dirender dari HTML Live Preview (Chrome headless backend)
+      // sehingga hasilnya identik dengan preview di layar.
+      const previewHtml = await buildPreviewHtml();
+      const blob = await suratService.downloadQuotationPdfFromHtml(previewHtml);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Surat-Penawaran-${String(res.data.nomor || res.data.id).replace(/[\\/:*?"<>|]+/g, '_')}.pdf`;
+      a.download = `Surat-Penawaran-${String(res.data.nomor || form.nomor || 'surat').replace(/[\\/:*?"<>|]+/g, '_')}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
 
-      showNotice('success', 'Surat tersimpan dan PDF berhasil diunduh.');
+      showNotice('success', isEditMode ? 'Surat diperbarui dan PDF berhasil diunduh.' : 'Surat tersimpan dan PDF berhasil diunduh.');
     } catch (err) {
       showNotice('error', err.message || 'Gagal menyimpan surat / mengunduh PDF. Silakan coba lagi.');
     } finally {
@@ -587,21 +626,11 @@ export default function CreateSuratQuotation() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h2 className="text-2xl font-bold text-text-primary">Buat Surat Penawaran</h2>
-            <p className="text-text-secondary mt-1">Susun penawaran dengan live preview</p>
+            <h2 className="text-2xl font-bold text-text-primary">{isEditMode ? 'Edit Surat Penawaran' : 'Buat Surat Penawaran'}</h2>
+            <p className="text-text-secondary mt-1">{isEditMode ? 'Ubah surat penawaran dengan live preview' : 'Susun penawaran dengan live preview'}</p>
           </div>
         </div>
         <div className="flex gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            icon={Save}
-            onClick={handleSave}
-            loading={isSubmitting}
-            className="whitespace-nowrap"
-          >
-            Simpan
-          </Button>
           <Button
             type="button"
             icon={FileDown}
@@ -637,6 +666,19 @@ export default function CreateSuratQuotation() {
         </div>
       )}
 
+      {/* Loading / error state untuk mode edit */}
+      {isEditMode && isLoadingDetail && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+        </div>
+      )}
+      {isEditMode && loadError && (
+        <div className="flex items-start gap-3 p-4 rounded-lg border bg-red-50 border-red-200 text-red-800" role="alert">
+          <p className="text-sm flex-1">{loadError}</p>
+        </div>
+      )}
+
+      {(!isEditMode || (!isLoadingDetail && !loadError)) && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* ---------------------------------------------------------- FORM */}
         <div className="lg:col-span-1 min-w-0 space-y-6">
@@ -648,7 +690,8 @@ export default function CreateSuratQuotation() {
                 value={form.nomor}
                 onChange={(e) => setField('nomor', e.target.value)}
                 error={errors.nomor}
-                placeholder="PNR/01101/ELMECH/2026"
+                placeholder="Nomor surat akan dibuat otomatis"
+                readOnly
               />
               <Input
                 label="Tanggal Surat"
@@ -661,13 +704,13 @@ export default function CreateSuratQuotation() {
                 label="Kota"
                 value={form.city}
                 onChange={(e) => setField('city', e.target.value)}
-                placeholder="Surabaya"
+                placeholder="Masukkan kota"
               />
               <Input
                 label="Lampiran"
                 value={form.attachment}
                 onChange={(e) => setField('attachment', e.target.value)}
-                placeholder="1 (Satu) Berkas"
+                placeholder="Masukkan lampiran"
               />
               <div className="sm:col-span-2">
                 <Input
@@ -675,7 +718,7 @@ export default function CreateSuratQuotation() {
                   value={form.subject}
                   onChange={(e) => setField('subject', e.target.value)}
                   error={errors.subject}
-                  placeholder="Surat Penawaran Harga ..."
+                  placeholder="Masukkan hal / judul surat"
                 />
               </div>
             </div>
@@ -689,7 +732,7 @@ export default function CreateSuratQuotation() {
                 value={form.customerName}
                 onChange={(e) => setField('customerName', e.target.value)}
                 error={errors.customerName}
-                placeholder="PSDKP BENOA"
+                placeholder="Masukkan nama instansi / perusahaan"
               />
               <Textarea
                 label="Alamat"
@@ -697,7 +740,7 @@ export default function CreateSuratQuotation() {
                 value={form.customerAddress}
                 onChange={(e) => setField('customerAddress', e.target.value)}
                 error={errors.customerAddress}
-                placeholder="Jalan Raya Pelabuhan Umum Benoa, ..."
+                placeholder="Masukkan alamat instansi / perusahaan"
               />
             </div>
           </Section>
@@ -709,7 +752,7 @@ export default function CreateSuratQuotation() {
                 label="Nama / Deskripsi Sistem yang Ditawarkan"
                 value={form.systemName}
                 onChange={(e) => setField('systemName', e.target.value)}
-                placeholder="sistem manajemen keuangan"
+                placeholder="Masukkan nama / deskripsi sistem"
               />
             </div>
           </Section>
@@ -766,7 +809,7 @@ export default function CreateSuratQuotation() {
                           value={item.nama_komponen}
                           onChange={(e) => updateItem(index, 'nama_komponen', e.target.value)}
                           error={itemError.nama_komponen}
-                          placeholder="Jasa Analisis dan Perancangan"
+                          placeholder="Masukkan nama komponen"
                         />
                       </div>
                       <div className="sm:col-span-2">
@@ -775,7 +818,7 @@ export default function CreateSuratQuotation() {
                           rows={3}
                           value={item.spesifikasi}
                           onChange={(e) => updateItem(index, 'spesifikasi', e.target.value)}
-                          placeholder={'Analisis kebutuhan sistem\nPenyusunan dokumen spesifikasi'}
+                          placeholder={'Masukkan spesifikasi, satu poin per baris'}
                         />
                       </div>
                       <Input
@@ -786,6 +829,7 @@ export default function CreateSuratQuotation() {
                         value={item.volume}
                         onChange={(e) => updateItem(index, 'volume', e.target.value)}
                         error={itemError.volume}
+                        placeholder="Masukkan jumlah"
                       />
                       <Select
                         label="Satuan"
@@ -793,6 +837,7 @@ export default function CreateSuratQuotation() {
                         onChange={(e) => updateItem(index, 'satuan', e.target.value)}
                         error={itemError.satuan}
                       >
+                        <option value="">Pilih satuan</option>
                         {SATUAN_OPTIONS.map((satuan) => (
                           <option key={satuan} value={satuan}>
                             {satuan}
@@ -807,6 +852,7 @@ export default function CreateSuratQuotation() {
                         value={item.harga_satuan}
                         onChange={(e) => updateItem(index, 'harga_satuan', e.target.value)}
                         error={itemError.harga_satuan}
+                        placeholder="Masukkan harga satuan"
                       />
                       <div className="w-full">
                         <label className="block text-sm font-medium text-text-primary mb-1.5">
@@ -848,6 +894,7 @@ export default function CreateSuratQuotation() {
                     step="0.01"
                     value={form.ppnRate}
                     onChange={(e) => setField('ppnRate', e.target.value)}
+                    placeholder="Masukkan persentase PPN"
                   />
                 </div>
               )}
@@ -867,6 +914,7 @@ export default function CreateSuratQuotation() {
                     step="0.01"
                     value={form.dpRate}
                     onChange={(e) => setField('dpRate', e.target.value)}
+                    placeholder="Masukkan persentase DP"
                   />
                 </div>
               )}
@@ -914,7 +962,7 @@ export default function CreateSuratQuotation() {
                     <Input
                       value={note}
                       onChange={(e) => updateNote(index, e.target.value)}
-                      placeholder="Durasi penyelesaian 3 Bulan."
+                      placeholder="Masukkan keterangan"
                     />
                   </div>
                   <button
@@ -943,6 +991,7 @@ export default function CreateSuratQuotation() {
                   label="Nama Perusahaan"
                   value={form.companyName}
                   onChange={(e) => setField('companyName', e.target.value)}
+                  placeholder="Masukkan nama perusahaan"
                 />
               </div>
               <Input
@@ -950,13 +999,13 @@ export default function CreateSuratQuotation() {
                 value={form.signerName}
                 onChange={(e) => setField('signerName', e.target.value)}
                 error={errors.signerName}
-                placeholder="Muhammad Taufiq Rahman"
+                placeholder="Masukkan nama penandatangan"
               />
               <Input
                 label="Jabatan"
                 value={form.signerTitle}
                 onChange={(e) => setField('signerTitle', e.target.value)}
-                placeholder="Direktur"
+                placeholder="Masukkan jabatan"
               />
 
               {/* Tanda tangan */}
@@ -1051,6 +1100,7 @@ export default function CreateSuratQuotation() {
           </Card>
         </div>
       </div>
+      )}
     </div>
   );
 }

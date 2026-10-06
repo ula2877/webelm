@@ -62,6 +62,12 @@ class SuratController extends Controller
 
         $query = DB::table('tb_surat');
 
+        // Default: hanya surat yang belum di-soft-delete. Filter
+        // status 'Dihapus' meng-override aturan ini secara eksplisit.
+        if ($request->query('status') !== 'Dihapus') {
+            $query->whereNull('deleted_at');
+        }
+
         // Search hits nomor AND JSON data fields that are commonly searched.
         // We search nomor and a few known keys inside data JSON.
         $search = trim((string) $request->query('search', ''));
@@ -134,6 +140,360 @@ class SuratController extends Controller
             'jenis_options' => $this->jenisOptions(),
             // Status options with live count
             'status_options' => $this->statusOptions(),
+        ], 200);
+    }
+
+    /**
+     * GET /api/surat/quotation/next-number?tanggal=YYYY-MM-DD
+     *
+     * Nomor surat berikutnya untuk surat penawaran (jenis='quotation')
+     * pada tanggal tersebut. Hanya surat aktif (deleted_at NULL) yang
+     * dihitung; jenis lain tidak ikut. Tidak memakai localStorage/counter
+     * frontend.
+     */
+    public function nextQuotationNumber(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'tanggal' => ['required', 'date'],
+        ]);
+
+        $next = $this->maxQuotationUrutanForTanggal($validated['tanggal']) + 1;
+
+        return response()->json([
+            'status' => 'ok',
+            'data' => [
+                'nomor' => $this->formatQuotationNomor($validated['tanggal'], $next),
+                'tanggal' => $validated['tanggal'],
+                'urutan' => $next,
+            ],
+        ], 200);
+    }
+
+    /**
+     * GET /api/surat/{id}/detail
+     *
+     * Full quotation payload for EDIT mode: tb_surat columns, the `data`
+     * JSON, and tb_surat_item rows.
+     */
+    public function detail(string $id): JsonResponse
+    {
+        $surat = DB::table('tb_surat')->where('id_surat', $id)->first();
+        if (!$surat) {
+            return $this->notFound();
+        }
+
+        $items = DB::table('tb_surat_item')
+            ->where('id_surat', $id)
+            ->orderBy('no_urut')
+            ->get();
+
+        $data = json_decode((string) $surat->data, true);
+        if (!is_array($data)) {
+            $data = [];
+        }
+
+        return response()->json([
+            'status' => 'ok',
+            'data' => [
+                'id' => (int) $surat->id_surat,
+                'uuid' => $surat->uuid_surat,
+                'jenis' => $surat->jenis,
+                'nomor' => $surat->nomor,
+                'tanggal' => $surat->tanggal,
+                'total' => (int) ($surat->total ?? 0),
+                'data' => $data,
+                'id_asset_ttd' => $surat->id_asset_ttd,
+                'id_asset_stempel' => $surat->id_asset_stempel,
+                'use_signature_stamp' => (bool) $surat->use_signature_stamp,
+                'posisi_ttd' => json_decode((string) $surat->posisi_ttd, true),
+                'posisi_stempel' => json_decode((string) $surat->posisi_stempel, true),
+                'items' => $items->map(fn ($it) => [
+                    'no_urut' => (int) $it->no_urut,
+                    'nama_komponen' => $it->nama_komponen,
+                    'spesifikasi' => json_decode((string) ($it->spesifikasi ?? ''), true) ?: [],
+                    'volume' => (float) $it->volume,
+                    'satuan' => $it->satuan,
+                    'harga_satuan' => (float) $it->harga_satuan,
+                ])->values(),
+            ],
+        ], 200);
+    }
+
+    /**
+     * PUT /api/surat/{id}/quotation
+     *
+     * UPDATE tb_surat + rebuild tb_surat_item untuk record yang SAMA.
+     * Tidak INSERT surat baru.
+     */
+    public function updateQuotation(Request $request, string $id): JsonResponse
+    {
+        $surat = DB::table('tb_surat')->where('id_surat', $id)->where('jenis', 'quotation')->first();
+        if (!$surat) {
+            return $this->notFound();
+        }
+
+        $validated = $request->validate([
+            'nomor' => ['required', 'string', 'max:50'],
+            'tanggal' => ['required', 'date'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'attachment' => ['nullable', 'string', 'max:100'],
+            'subject' => ['required', 'string', 'max:255'],
+            'customerName' => ['required', 'string', 'max:255'],
+            'customerAddress' => ['required', 'string'],
+            'systemName' => ['required', 'string', 'max:255'],
+            'usePPN' => ['sometimes', 'boolean'],
+            'ppnRate' => ['required_if:usePPN,true', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'useDP' => ['sometimes', 'boolean'],
+            'dpRate' => ['required_if:useDP,true', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'notes' => ['nullable', 'array'],
+            'notes.*' => ['string', 'max:1000'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.nama_komponen' => ['required', 'string', 'max:500'],
+            'items.*.spesifikasi' => ['nullable'],
+            'items.*.volume' => ['required', 'numeric', 'gt:0', 'max:999999999999'],
+            'items.*.satuan' => ['required', 'string', 'in:PCS,Paket,OH,LS'],
+            'items.*.harga_satuan' => ['required', 'numeric', 'min:0', 'max:999999999999'],
+            'useSignature' => ['sometimes', 'boolean'],
+            'useStamp' => ['sometimes', 'boolean'],
+            'signature_asset_id' => ['nullable', 'integer'],
+            'stamp_asset_id' => ['nullable', 'integer'],
+            'signaturePosition' => ['nullable', 'array'],
+            'signaturePosition.x' => ['nullable', 'numeric'],
+            'signaturePosition.y' => ['nullable', 'numeric'],
+            'signaturePosition.zoom' => ['nullable', 'numeric', 'min:0.1', 'max:3'],
+            'stampPosition' => ['nullable', 'array'],
+            'stampPosition.x' => ['nullable', 'numeric'],
+            'stampPosition.y' => ['nullable', 'numeric'],
+            'stampPosition.zoom' => ['nullable', 'numeric', 'min:0.1', 'max:3'],
+            'signature' => ['nullable', 'array'],
+            'signature.companyName' => ['nullable', 'string', 'max:255'],
+            'signature.signerName' => ['required', 'string', 'max:255'],
+            'signature.signerTitle' => ['nullable', 'string', 'max:100'],
+        ], [
+            'nomor.required' => 'Nomor surat wajib diisi.',
+            'tanggal.required' => 'Tanggal surat wajib diisi.',
+            'subject.required' => 'Hal / judul surat wajib diisi.',
+            'customerName.required' => 'Nama instansi/perusahaan wajib diisi.',
+            'customerAddress.required' => 'Alamat penerima wajib diisi.',
+            'systemName.required' => 'Nama/deskripsi sistem wajib diisi.',
+            'items.required' => 'Minimal satu komponen penawaran harus ditambahkan.',
+            'items.*.nama_komponen.required' => 'Nama komponen wajib diisi.',
+            'items.*.volume.gt' => 'Volume harus lebih dari 0.',
+            'items.*.satuan.in' => 'Satuan tidak valid. Pilihan: PCS, Paket, OH, LS.',
+            'ppnRate.required_if' => 'Persentase PPN wajib diisi.',
+            'dpRate.required_if' => 'Persentase DP wajib diisi.',
+            'signature.signerName.required' => 'Nama penandatangan wajib diisi.',
+        ]);
+
+        // Nomor unik per jenis, kecuali record ini sendiri.
+        $dupe = DB::table('tb_surat')
+            ->where('jenis', 'quotation')
+            ->where('nomor', $validated['nomor'])
+            ->where('id_surat', '<>', $id)
+            ->whereNull('deleted_at')
+            ->exists();
+        if ($dupe) {
+            throw ValidationException::withMessages([
+                'nomor' => ['Nomor surat sudah digunakan pada surat penawaran lain.'],
+            ]);
+        }
+
+        $signatureAssetId = !empty($validated['signature_asset_id']) ? (int) $validated['signature_asset_id'] : null;
+        $stampAssetId = !empty($validated['stamp_asset_id']) ? (int) $validated['stamp_asset_id'] : null;
+
+        $signatureAsset = null;
+        if ($signatureAssetId !== null) {
+            $signatureAsset = DB::table('tb_surat_asset')
+                ->where('id_asset', $signatureAssetId)
+                ->where('jenis', 'signature')
+                ->whereNull('deleted_at')
+                ->first();
+            if (!$signatureAsset) {
+                throw ValidationException::withMessages(['signature_asset_id' => ['Asset tanda tangan tidak valid.']]);
+            }
+        }
+
+        $stampAsset = null;
+        if ($stampAssetId !== null) {
+            $stampAsset = DB::table('tb_surat_asset')
+                ->where('id_asset', $stampAssetId)
+                ->where('jenis', 'stamp')
+                ->whereNull('deleted_at')
+                ->first();
+            if (!$stampAsset) {
+                throw ValidationException::withMessages(['stamp_asset_id' => ['Asset stempel tidak valid.']]);
+            }
+        }
+
+        $itemRows = [];
+        $total = 0;
+        foreach ($validated['items'] as $index => $item) {
+            $volume = (float) $item['volume'];
+            $harga = (float) $item['harga_satuan'];
+            $total += (int) round($volume * $harga);
+
+            $specs = $item['spesifikasi'] ?? null;
+            if (is_string($specs)) {
+                $specs = array_values(array_filter(
+                    array_map('trim', explode("\n", $specs)),
+                    fn ($line) => $line !== ''
+                ));
+            }
+            $specs = is_array($specs) ? array_values(array_map('strval', $specs)) : [];
+
+            $itemRows[] = [
+                'id_surat' => (int) $id,
+                'no_urut' => $index + 1,
+                'nama_komponen' => $item['nama_komponen'],
+                'spesifikasi' => $specs === [] ? null : json_encode($specs),
+                'volume' => $volume,
+                'satuan' => $item['satuan'],
+                'harga_satuan' => (int) round($harga),
+                'data' => null,
+            ];
+        }
+
+        $usePPN = !empty($validated['usePPN']);
+        $ppnRate = $usePPN ? (float) $validated['ppnRate'] : 0;
+        $ppn = (int) round($total * $ppnRate / 100);
+        $grandTotal = $total + $ppn;
+
+        $useDP = !empty($validated['useDP']);
+        $dpRate = $useDP ? (float) $validated['dpRate'] : 0;
+        $dp = (int) round($grandTotal * $dpRate / 100);
+
+        $useSignature = !empty($validated['useSignature']);
+        $useStamp = !empty($validated['useStamp']);
+
+        $position = function (?array $pos): array {
+            return [
+                'x' => (float) ($pos['x'] ?? 0),
+                'y' => (float) ($pos['y'] ?? 0),
+                'zoom' => (float) ($pos['zoom'] ?? 1),
+            ];
+        };
+        $posTtd = $useSignature ? $position(is_array($validated['signaturePosition'] ?? null) ? $validated['signaturePosition'] : null) : null;
+        $posStempel = $useStamp ? $position(is_array($validated['stampPosition'] ?? null) ? $validated['stampPosition'] : null) : null;
+
+        $signatureBlock = is_array($validated['signature'] ?? null) ? $validated['signature'] : [];
+
+        $dataJson = [
+            'city' => $validated['city'] ?? null,
+            'attachment' => $validated['attachment'] ?? null,
+            'subject' => $validated['subject'],
+            'customerName' => $validated['customerName'],
+            'customerAddress' => $validated['customerAddress'],
+            'systemName' => $validated['systemName'],
+            'usePPN' => $usePPN,
+            'ppnRate' => $usePPN ? $ppnRate : 0,
+            'useDP' => $useDP,
+            'dpRate' => $useDP ? $dpRate : 0,
+            'useSignatureStamp' => ($useSignature || $useStamp),
+            'useSignature' => $useSignature,
+            'useStamp' => $useStamp,
+            'signatureImage' => $signatureAsset ? $signatureAsset->path : null,
+            'stampImage' => $stampAsset ? $stampAsset->path : null,
+            'signaturePosition' => $posTtd,
+            'stampPosition' => $posStempel,
+            'signature' => [
+                'companyName' => (string) ($signatureBlock['companyName'] ?? ''),
+                'signerName' => (string) ($signatureBlock['signerName'] ?? ''),
+                'signerTitle' => (string) ($signatureBlock['signerTitle'] ?? ''),
+            ],
+            'notes' => array_values(array_filter(
+                array_map('strval', $validated['notes'] ?? []),
+                fn ($n) => trim($n) !== ''
+            )),
+            'totals' => [
+                'total' => $total,
+                'ppn' => $ppn,
+                'ppnRate' => $usePPN ? $ppnRate : 0,
+                'grandTotal' => $grandTotal,
+                'dp' => $useDP ? $dp : 0,
+                'dpRate' => $useDP ? $dpRate : 0,
+            ],
+        ];
+
+        try {
+            DB::transaction(function () use ($id, $validated, $grandTotal, $dataJson, $signatureAssetId, $stampAssetId, $useSignature, $useStamp, $posTtd, $posStempel, $itemRows) {
+                DB::table('tb_surat')->where('id_surat', $id)->update([
+                    'nomor' => $validated['nomor'],
+                    'tanggal' => $validated['tanggal'],
+                    'total' => $grandTotal,
+                    'data' => json_encode($dataJson),
+                    'updated_at' => now(),
+                    'id_asset_ttd' => $signatureAssetId,
+                    'id_asset_stempel' => $stampAssetId,
+                    'use_signature_stamp' => ($useSignature || $useStamp) ? 1 : 0,
+                    'posisi_ttd' => $posTtd !== null ? json_encode($posTtd) : null,
+                    'posisi_stempel' => $posStempel !== null ? json_encode($posStempel) : null,
+                ]);
+
+                DB::table('tb_surat_item')->where('id_surat', $id)->delete();
+                foreach ($itemRows as $itemRow) {
+                    DB::table('tb_surat_item')->insert($itemRow);
+                }
+            });
+        } catch (QueryException $e) {
+            Log::error('Gagal mengupdate surat penawaran', ['error' => $e->getMessage(), 'id' => $id]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal menyimpan surat. Silakan coba lagi.',
+            ], 500);
+        }
+
+        return response()->json([
+            'status' => 'ok',
+            'message' => 'Surat penawaran berhasil diperbarui.',
+            'data' => [
+                'id' => (int) $id,
+                'nomor' => $validated['nomor'],
+                'tanggal' => $validated['tanggal'],
+                'total' => $grandTotal,
+                'jumlah_item' => count($itemRows),
+            ],
+        ], 200);
+    }
+
+    /**
+     * DELETE /api/surat/{id}
+     *
+     * HARD delete: row di tb_surat benar-benar dihapus (bukan soft delete).
+     * tb_surat_item terkait dihapus dulu agar tidak ada foreign key
+     * yang menggantung. Id_asset_ttd/id_asset_stempel hanya reference,
+     * asset di tb_surat_asset TIDAK dihapus (bisa dipakai surat lain).
+     */
+    public function destroy(string $id): JsonResponse
+    {
+        $surat = DB::table('tb_surat')
+            ->where('id_surat', $id)
+            ->first();
+
+        if (!$surat) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Surat tidak ditemukan.',
+            ], 404);
+        }
+
+        try {
+            DB::transaction(function () use ($id) {
+                DB::table('tb_surat_item')->where('id_surat', $id)->delete();
+                DB::table('tb_surat')->where('id_surat', $id)->delete();
+            });
+        } catch (QueryException $e) {
+            Log::error('Gagal menghapus surat', ['error' => $e->getMessage(), 'id' => $id]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal menghapus surat. Silakan coba lagi.',
+            ], 500);
+        }
+
+        return response()->json([
+            'status' => 'ok',
+            'message' => 'Surat berhasil dihapus secara permanen.',
         ], 200);
     }
 
@@ -362,15 +722,20 @@ class SuratController extends Controller
             ],
         ];
 
-        // Nomor surat unik per jenis (uq_surat_jenis_nomor).
+        // ---- Nomor surat unik per jenis (uq_surat_jenis_nomor).
+        // Nomor digenerate SERVER dari data aktif tb_surat + sequence
+        // table (bukan dari client), supaya frontend & DB selalu sama.
+        // Cek duplikat client tetap dijalankan untuk keamanan.
         $dupe = DB::table('tb_surat')
             ->where('jenis', 'quotation')
             ->where('nomor', $validated['nomor'])
             ->whereNull('deleted_at')
             ->exists();
         if ($dupe) {
-            throw ValidationException::withMessages([
-                'nomor' => ['Nomor surat sudah digunakan pada surat penawaran lain.'],
+            // Client mengirim nomor yang sudah dipakai - biarkan server
+            // yang menggantikannya dengan nomor berikutnya di bawah.
+            Log::info('Nomor dari client sudah dipakai, akan digenerate ulang', [
+                'nomor_client' => $validated['nomor'],
             ]);
         }
 
@@ -382,11 +747,38 @@ class SuratController extends Controller
         } while (DB::table('tb_surat')->where('uuid_surat', $uuid)->exists());
 
         try {
-            $idSurat = DB::transaction(function () use ($validated, $user, $uuid, $grandTotal, $dataJson, $signatureAssetId, $stampAssetId, $useSignature, $useStamp, $posTtd, $posStempel, $itemRows) {
+            $generatedNomor = null;
+            $idSurat = DB::transaction(function () use ($validated, $user, $uuid, $grandTotal, $dataJson, $signatureAssetId, $stampAssetId, $useSignature, $useStamp, $posTtd, $posStempel, $itemRows, &$generatedNomor) {
+                // Kunci baris sequence (jenis,tanggal) agar dua request
+                // bersamaan terserialisasi; buat barisnya bila belum ada.
+                DB::table('tb_nomor_surat_sequence')->insertOrIgnore([
+                    'jenis' => 'quotation',
+                    'tanggal' => $validated['tanggal'],
+                    'urutan_terakhir' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $seq = DB::table('tb_nomor_surat_sequence')
+                    ->where('jenis', 'quotation')
+                    ->where('tanggal', $validated['tanggal'])
+                    ->lockForUpdate()
+                    ->first();
+
+                // Nomor berikutnya = urutan terbesar surat penawaran
+                // AKTIF hari itu + 1 (soft-deleted tidak dihitung).
+                $next = $this->maxQuotationUrutanForTanggal($validated['tanggal']) + 1;
+
+                DB::table('tb_nomor_surat_sequence')
+                    ->where('id', $seq->id)
+                    ->update(['urutan_terakhir' => $next, 'updated_at' => now()]);
+
+                $nomor = $this->formatQuotationNomor($validated['tanggal'], $next);
+                $generatedNomor = $nomor;
+
                 $id = DB::table('tb_surat')->insertGetId([
                     'uuid_surat' => $uuid,
                     'jenis' => 'quotation',
-                    'nomor' => $validated['nomor'],
+                    'nomor' => $nomor,
                     'tanggal' => $validated['tanggal'],
                     'created_by' => $user->id_user,
                     'total' => $grandTotal,
@@ -410,7 +802,7 @@ class SuratController extends Controller
         } catch (QueryException $e) {
             Log::error('Gagal menyimpan surat penawaran', [
                 'error' => $e->getMessage(),
-                'nomor' => $validated['nomor'],
+                'nomor' => $generatedNomor ?? null,
             ]);
 
             return response()->json([
@@ -422,7 +814,7 @@ class SuratController extends Controller
         Log::info('Surat penawaran tersimpan', [
             'id_surat' => $idSurat,
             'uuid' => $uuid,
-            'nomor' => $validated['nomor'],
+            'nomor' => $generatedNomor,
             'created_by' => $user->id_user,
             'jumlah_item' => count($itemRows),
         ]);
@@ -433,7 +825,7 @@ class SuratController extends Controller
             'data' => [
                 'id' => (int) $idSurat,
                 'uuid' => $uuid,
-                'nomor' => $validated['nomor'],
+                'nomor' => $generatedNomor,
                 'tanggal' => $validated['tanggal'],
                 'jenis' => 'quotation',
                 'total' => $grandTotal,
@@ -494,7 +886,156 @@ class SuratController extends Controller
         );
     }
 
+    /**
+     * POST /api/surat/quotation/pdf-from-html
+     *
+     * Renders the exact Live Preview HTML (serialized from the on-screen
+     * preview, with the application's live CSS) through Chrome headless
+     * --print-to-pdf, so the PDF matches the Live Preview 1:1.
+     */
+    public function pdfFromHtml(Request $request)
+    {
+        $validated = $request->validate([
+            'html' => ['required', 'string', 'max:20971520'], // ~20 MB
+        ]);
+
+        $tmpHtml = tempnam(sys_get_temp_dir(), 'quotation_') . '.html';
+        $tmpPdf = tempnam(sys_get_temp_dir(), 'quotation_') . '.pdf';
+        file_put_contents($tmpHtml, $validated['html']);
+
+        $chrome = $this->chromeBinaryPath();
+        if (!$chrome) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Chrome tidak ditemukan di server. Hubungi administrator.',
+            ], 500);
+        }
+
+        $cmd = sprintf(
+            '%s --headless=new --disable-gpu --no-pdf-header-footer --disable-extensions --virtual-time-budget=10000 --print-to-pdf=%s %s',
+            escapeshellarg($chrome),
+            escapeshellarg($tmpPdf),
+            escapeshellarg('file:///' . str_replace('\\', '/', $tmpHtml))
+        );
+
+        // Jalankan Chrome dengan TIMEOUT keras (60 detik). Tanpa batas ini,
+        // proses Chrome yang menggantung akan memblokir PHP dev server
+        // (single-threaded) selamanya dan menggantung seluruh API.
+        $timeoutSec = 60;
+        $process = proc_open($cmd, [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ], $pipes);
+
+        $outputLines = '';
+        $timedOut = false;
+        if (is_resource($process)) {
+            fclose($pipes[0]);
+            stream_set_blocking($pipes[1], false);
+            stream_set_blocking($pipes[2], false);
+            $start = microtime(true);
+            do {
+                $status = proc_get_status($process);
+                $outputLines .= stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);
+                if ($status['running'] && (microtime(true) - $start) > $timeoutSec) {
+                    $timedOut = true;
+                    proc_terminate($process);
+                    @proc_close($process);
+                    break;
+                }
+                if (!$status['running']) break;
+                usleep(200000);
+            } while (true);
+            if (!$timedOut) {
+                proc_close($process);
+            }
+        } else {
+            $timedOut = false;
+        }
+
+        if ($timedOut || !file_exists($tmpPdf) || filesize($tmpPdf) < 1000) {
+            Log::error('Chrome print-to-pdf gagal', ['timedOut' => $timedOut, 'output' => trim($outputLines)]);
+            @unlink($tmpHtml);
+            @unlink($tmpPdf);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => $timedOut
+                    ? 'Gagal membuat PDF: proses Chrome melebihi batas waktu. Silakan coba lagi.'
+                    : 'Gagal membuat PDF. Silakan coba lagi.',
+            ], 500);
+        }
+
+        $pdfBytes = file_get_contents($tmpPdf);
+        @unlink($tmpHtml);
+        @unlink($tmpPdf);
+
+        return response()->streamDownload(function () use ($pdfBytes) {
+            echo $pdfBytes;
+        }, 'Surat-Penawaran.pdf', [
+            'Content-Type' => 'application/pdf',
+            'Cache-Control' => 'no-store',
+        ]);
+    }
+
+    /** Locate the Chrome binary on this machine. */
+    private function chromeBinaryPath(): ?string
+    {
+        $candidates = [
+            env('CHROME_PATH'),
+            'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+            'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+            'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+            'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+        ];
+        foreach ($candidates as $path) {
+            if ($path && is_file($path)) {
+                return $path;
+            }
+        }
+
+        return null;
+    }
+
     // ------------------------------------------------------------------ helpers
+
+    /**
+     * Urutan terbesar yang sudah dipakai surat penawaran AKTIF pada
+     * tanggal tertentu, diambil dari pola nomor "PNR/DDMM[urutan]/ELMECH/YYYY".
+     * Soft-deleted (deleted_at != null) dan jenis selain quotation
+     * tidak dihitung.
+     */
+    private function maxQuotationUrutanForTanggal(string $tanggal): int
+    {
+        $ts = strtotime($tanggal);
+        $dd = date('d', $ts);
+        $mm = date('m', $ts);
+
+        $nomors = DB::table('tb_surat')
+            ->where('jenis', 'quotation')
+            ->where('tanggal', $tanggal)
+            ->whereNull('deleted_at')
+            ->pluck('nomor');
+
+        $max = 0;
+        foreach ($nomors as $nomor) {
+            if (preg_match('/^PNR\/(\d{2})(\d{2})(\d+)\/ELMECH\/\d{4}$/', (string) $nomor, $m)
+                && $m[1] === $dd && $m[2] === $mm) {
+                $max = max($max, (int) $m[3]);
+            }
+        }
+
+        return $max;
+    }
+
+    /** "PNR/DDMM[urutan]/ELMECH/YYYY" - mengikuti contoh existing. */
+    private function formatQuotationNomor(string $tanggal, int $urutan): string
+    {
+        $ts = strtotime($tanggal);
+
+        return sprintf('PNR/%s%s%d/ELMECH/%s', date('d', $ts), date('m', $ts), $urutan, date('Y', $ts));
+    }
 
     /**
      * Turn a tb_surat row into an API payload.

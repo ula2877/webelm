@@ -128,70 +128,31 @@ export function emptyItem() {
     id: `item-${Math.random().toString(36).slice(2, 9)}`,
     nama_komponen: '',
     spesifikasi: '',
-    volume: 1,
-    satuan: 'Paket',
-    harga_satuan: 0,
+    volume: '',
+    satuan: '',
+    harga_satuan: '',
   };
-}
-
-/** Demo items mirroring the reference quotation document (frontend only). */
-function demoItems() {
-  return [
-    {
-      ...emptyItem(),
-      nama_komponen: 'Jasa Analisis dan Perancangan',
-      spesifikasi:
-        'Analisis kebutuhan sistem (requirement gathering)\nPenyusunan dokumen spesifikasi sistem (SRS)\nPerancangan database (ERD, relasi tabel, migration)\nPerancangan UI/UX aplikasi',
-      volume: 1,
-      satuan: 'Paket',
-      harga_satuan: 6500000,
-    },
-    {
-      ...emptyItem(),
-      nama_komponen: 'Pengembangan Backend Aplikasi',
-      spesifikasi:
-        'Setup project backend & architecture\nAuthentication & authorization\nUser management & role permission\nMaster data management\nModul transaksi keuangan\nModul approval workflow\nAudit trail & logging\nReporting API\nExport Excel/PDF',
-      volume: 1,
-      satuan: 'Paket',
-      harga_satuan: 15000000,
-    },
-    {
-      ...emptyItem(),
-      nama_komponen: 'Pengembangan Frontend',
-      spesifikasi:
-        'Setup Angular + TypeScript + Ant Design\nLayout dashboard utama\nLogin & user interface\nDashboard monitoring\nForm transaksi\nTable data + filtering + pagination\nApproval interface\nGrafik dan visualisasi data\nExport dan print interface',
-      volume: 1,
-      satuan: 'Paket',
-      harga_satuan: 12500000,
-    },
-    {
-      ...emptyItem(),
-      nama_komponen: 'Infrastruktur Server',
-      spesifikasi:
-        'VPS Cloud Server 1 tahun\nDomain\nSSL Certificate\nBackup server\nMonitoring server',
-      volume: 1,
-      satuan: 'Paket',
-      harga_satuan: 10000000,
-    },
-  ];
 }
 
 export function createInitialForm() {
   return {
-    nomor: 'PNR/14091/ELMECH/2026',
-    tanggal: '2026-09-14',
+    nomor: '',
+    tanggal: (() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })(),
     city: 'Surabaya',
-    attachment: '-',
-    subject: 'Surat Penawaran Harga Aplikasi Keuangan',
-    customerName: 'PSDKP BENOA',
-    customerAddress: 'Jalan Raya Pelabuhan Umum Benoa, Denpasar Selatan, Bali',
-    systemName: 'sistem manajemen keuangan',
-    items: demoItems(),
+    attachment: '',
+    subject: '',
+    customerName: '',
+    customerAddress: '',
+    systemName: '',
+    items: [emptyItem()],
     usePPN: true,
     ppnRate: 11,
     useDP: false,
-    dpRate: 30,
-    notes: ['Durasi penyelesaian 3 Bulan.', 'Sudah Termasuk Jasa Instalasi Cloud Server'],
+    dpRate: '',
+    notes: [''],
     // Signature / stamp - independent toggles + positions (frontend-only images).
     useSignature: false,
     useStamp: false,
@@ -318,4 +279,66 @@ export function rupiah(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return formatCurrency(0);
   return formatCurrency(n);
+}
+
+/**
+ * Map hasil GET /api/surat/{id}/detail ke form state yang dipakai
+ * QuotationPreview/CreateSuratQuotation. Dipakai oleh mode edit dan
+ * halaman view agar datanya sama persis.
+ */
+export function formFromQuotationDetail(detail) {
+  if (!detail) return null;
+  const d = detail.data || {};
+  const pos = (raw) => {
+    const p = raw && typeof raw === 'object' ? raw : {};
+    return {
+      x: Number(p.x) || 0,
+      y: Number(p.y) || 0,
+      // backend menyimpan multiplier (1.58); form memakai persen
+      zoom: Math.round((Number(p.zoom) || 1) * 100),
+    };
+  };
+  const sigPos = pos(detail.posisi_ttd ?? d.signaturePosition);
+  const stmPos = pos(detail.posisi_stempel ?? d.stampPosition);
+
+  return {
+    nomor: detail.nomor || '',
+    tanggal: detail.tanggal || '',
+    city: d.city ?? '',
+    attachment: d.attachment ?? '',
+    subject: d.subject ?? '',
+    customerName: d.customerName ?? '',
+    customerAddress: d.customerAddress ?? '',
+    systemName: d.systemName ?? '',
+    usePPN: !!d.usePPN,
+    ppnRate: d.ppnRate ?? '',
+    useDP: !!d.useDP,
+    dpRate: d.dpRate ?? '',
+    notes: Array.isArray(d.notes) && d.notes.length ? d.notes : [''],
+    useSignature: !!d.useSignature || !!detail.id_asset_ttd,
+    useStamp: !!d.useStamp || !!detail.id_asset_stempel,
+    signatureImage: d.signatureImage ?? null,
+    stampImage: d.stampImage ?? null,
+    signatureX: sigPos.x,
+    signatureY: sigPos.y,
+    signatureZoom: sigPos.zoom,
+    stampX: stmPos.x,
+    stampY: stmPos.y,
+    stampZoom: stmPos.zoom,
+    companyName: d.signature?.companyName ?? '',
+    signerName: d.signature?.signerName ?? '',
+    signerTitle: d.signature?.signerTitle ?? '',
+    items: Array.isArray(detail.items) && detail.items.length
+      ? detail.items.map((it) => ({
+          id: `item-${Math.random().toString(36).slice(2, 9)}`,
+          nama_komponen: it.nama_komponen ?? '',
+          spesifikasi: Array.isArray(it.spesifikasi) ? it.spesifikasi.join('\n') : '',
+          volume: it.volume ?? '',
+          satuan: it.satuan ?? '',
+          harga_satuan: it.harga_satuan ?? '',
+        }))
+      : [emptyItem()],
+    useSignatureAssetId: detail.id_asset_ttd ?? null,
+    useStampAssetId: detail.id_asset_stempel ?? null,
+  };
 }

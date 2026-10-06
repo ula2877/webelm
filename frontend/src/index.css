@@ -89,6 +89,21 @@ body {
 .stagger-5 { animation-delay: 0.25s; }
 .stagger-6 { animation-delay: 0.3s; }
 
+/* Page title / subtitle — konsisten di seluruh halaman */
+h2.text-2xl.font-bold.text-text-primary {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+p.text-text-secondary.mt-1 {
+  font-size: 0.875rem;
+}
+@media (max-width: 640px) {
+  h2.text-2xl.font-bold.text-text-primary {
+    font-size: 1.125rem;
+    line-height: 1.5rem;
+  }
+}
+
 /* ==========================================================================
    Quotation letter - A4 document preview + print layout
    ========================================================================== */

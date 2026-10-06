@@ -9,6 +9,7 @@ import EditUser from './pages/EditUser';
 import SuratOverview from './pages/SuratOverview';
 import SuratQuotation from './pages/SuratQuotation';
 import CreateSuratQuotation from './pages/CreateSuratQuotation';
+import ViewSuratQuotation from './pages/ViewSuratQuotation';
 import SuratInvoice from './pages/SuratInvoice';
 import SuratDeliveryNote from './pages/SuratDeliveryNote';
 import SuratHandover from './pages/SuratHandover';
@@ -82,6 +83,8 @@ function AppRoutes() {
         <Route path="/letters" element={<SuratOverview />} />
         <Route path="/letters/quotation" element={<SuratQuotation />} />
         <Route path="/letters/quotation/create" element={<CreateSuratQuotation />} />
+        <Route path="/letters/quotation/:id/edit" element={<CreateSuratQuotation />} />
+        <Route path="/letters/quotation/:id/view" element={<ViewSuratQuotation />} />
         <Route path="/letters/invoice" element={<SuratInvoice />} />
         <Route path="/letters/delivery-note" element={<SuratDeliveryNote />} />
         <Route path="/letters/handover" element={<SuratHandover />} />

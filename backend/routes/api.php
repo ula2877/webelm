@@ -57,13 +57,21 @@ Route::middleware('auth')->group(function () {
 
     // Surat - operates on the existing tb_surat table.
     Route::get('/surat', [SuratController::class, 'index']);
+    Route::get('/surat/quotation/next-number', [SuratController::class, 'nextQuotationNumber']);
     Route::get('/surat/{id}', [SuratController::class, 'show'])
         ->where('id', '[0-9]+');
 
     // Surat Penawaran - INSERT ke tb_surat + tb_surat_item (existing
     // tables, no schema change). PDF dibuat SETELAH data tersimpan.
     Route::post('/surat/quotation', [SuratController::class, 'storeQuotation']);
+    Route::post('/surat/quotation/pdf-from-html', [SuratController::class, 'pdfFromHtml']);
     Route::get('/surat/{id}/pdf', [SuratController::class, 'pdf'])
+        ->where('id', '[0-9]+');
+    Route::get('/surat/{id}/detail', [SuratController::class, 'detail'])
+        ->where('id', '[0-9]+');
+    Route::delete('/surat/{id}', [SuratController::class, 'destroy'])
+        ->where('id', '[0-9]+');
+    Route::put('/surat/{id}/quotation', [SuratController::class, 'updateQuotation'])
         ->where('id', '[0-9]+');
 
     // Surat assets (signature / stamp) - operates on the existing tb_surat_asset
