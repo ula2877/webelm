@@ -418,7 +418,20 @@ export default function CreateSuratJenis({ jenisKey }) {
 
       showNotice('success', isEditMode ? 'Surat diperbarui dan PDF berhasil diunduh.' : 'Surat tersimpan dan PDF berhasil diunduh.');
     } catch (err) {
-      showNotice('error', err.message || 'Gagal menyimpan surat / mengunduh PDF. Silakan coba lagi.');
+      // Tampilkan pesan validasi per-field dari Laravel (422) kalau ada,
+      // supaya field yang ditolak terlihat jelas di UI - bukan hanya
+      // "The given data was invalid."
+      const fieldErrors = err?.errors
+        ? Object.entries(err.errors)
+            .map(([field, msgs]) => `${field}: ${[].concat(msgs).join(' ')}`)
+            .join(' | ')
+        : '';
+      showNotice(
+        'error',
+        fieldErrors
+          ? `Validasi gagal - ${fieldErrors}`
+          : err.message || 'Gagal menyimpan surat / mengunduh PDF. Silakan coba lagi.'
+      );
     } finally {
       setIsSubmitting(false);
     }

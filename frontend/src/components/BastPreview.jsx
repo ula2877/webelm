@@ -275,17 +275,18 @@ export default function BastPreview({ form }) {
 
   const pages = useMemo(() => {
     // Sebelum selesai mengukur, tampilkan satu halaman agar tidak blank.
+    // Setiap node dibungkus frag() supaya punya key unik (dicek React).
     if (!measurements) {
       return [
         [
-          renderTitle(),
-          renderPembuka(),
-          renderPihak(pihakPertama),
-          renderPihak(pihakKedua),
-          renderSerah(),
-          renderTable(indexedItems),
-          renderPenutup(),
-          renderSignature(),
+          frag('title', renderTitle()),
+          frag('pembuka', renderPembuka()),
+          frag('pihakPertama', renderPihak(pihakPertama)),
+          frag('pihakKedua', renderPihak(pihakKedua)),
+          frag('serah', renderSerah()),
+          frag('table', renderTable(indexedItems)),
+          frag('penutup', renderPenutup()),
+          frag('signature', renderSignature()),
         ],
       ];
     }
