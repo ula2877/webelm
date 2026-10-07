@@ -119,6 +119,13 @@ export function formatRupiah(value) {
   return formatCurrency(Number.isFinite(n) ? n : 0);
 }
 
+/** "23.530.000" (tanpa Rp) - untuk kotak "Jumlah Rp." di cetakan. */
+export function formatNominalAngka(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '0';
+  return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(n);
+}
+
 // ------------------------------------------------------------------- tanggal
 /** "07 Oktober 2026" - zero padded, mengikuti cetakan kwitansi. */
 export function formatTanggalKwitansi(dateStr) {

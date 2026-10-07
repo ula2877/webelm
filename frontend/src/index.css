@@ -971,15 +971,15 @@ body {
   font-variant-numeric: tabular-nums;
 }
 /* Deskripsi "Untuk pembayaran": boleh panjang, turun ke baris berikutnya.
-   line-height 0.85 cm ~= jarak antar garis putus cetakan (4.05/4.9/5.6 cm).
+   Spasi antar baris dibuat rapat (6mm).
    max-height = 4 baris; kelebihan dipotong agar tidak menabrak kotak
    "Jumlah Rp." atau blok penandatangan. */
 .kw-desc {
   white-space: normal;
   word-break: break-word;
-  line-height: 8.5mm;
+  line-height: 6mm;
   text-align: left;
-  max-height: 34mm;
+  max-height: 24mm;
   overflow: hidden;
 }
 /* Field di sisi kanan (nomor invoice, kota-tanggal). */
