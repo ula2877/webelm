@@ -161,9 +161,10 @@ export default function InvoicePreview({ form }) {
   );
 
   const renderSignature = () => (
-    <div className="invoice-signature">
-      <p className="invoice-closing">Hormat Kami,</p>
-      <div className="invoice-signature-box">
+    <div className="letter-signature">
+      <p>Hormat Kami,</p>
+      <p className="font-bold">{form.companyName || '-'}</p>
+      <div className="letter-signature-box">
         {form.useStamp && form.stampImage ? (
           <img
             src={form.stampImage}
@@ -183,8 +184,7 @@ export default function InvoicePreview({ form }) {
           />
         ) : null}
       </div>
-      <p className="invoice-signature-company">{form.companyName || '-'}</p>
-      <p className="invoice-signer-name">{form.signerName || '-'}</p>
+      <p className="signer-name">{form.signerName || '-'}</p>
       <p>{form.signerTitle || '-'}</p>
     </div>
   );
