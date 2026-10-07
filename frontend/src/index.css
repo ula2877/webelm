@@ -90,17 +90,22 @@ body {
 .stagger-6 { animation-delay: 0.3s; }
 
 /* Page title / subtitle — konsisten di seluruh halaman */
-h2.text-2xl.font-bold.text-text-primary {
-  font-size: 1.25rem;
-  line-height: 1.75rem;
+.page-title {
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
 }
-p.text-text-secondary.mt-1 {
+.page-subtitle {
   font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--color-text-secondary);
+  margin-top: 0.25rem;
 }
 @media (max-width: 640px) {
-  h2.text-2xl.font-bold.text-text-primary {
-    font-size: 1.125rem;
-    line-height: 1.5rem;
+  .page-title {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
   }
 }
 

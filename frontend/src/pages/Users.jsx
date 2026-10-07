@@ -245,8 +245,8 @@ export default function Users() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-text-primary">User Management</h2>
-          <p className="text-text-secondary mt-1">Manage your team members and their permissions</p>
+          <h2 className="page-title">User Management</h2>
+          <p className="page-subtitle">Manage your team members and their permissions</p>
         </div>
         <Link to="/users/create">
           <Button icon={Plus}>

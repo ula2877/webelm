@@ -46,8 +46,8 @@ export default function Notifications() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-text-primary">Notifications</h2>
-          <p className="text-text-secondary mt-1">
+          <h2 className="page-title">Notifications</h2>
+          <p className="page-subtitle">
             {unreadCount > 0 ? `You have ${unreadCount} unread notifications` : 'All caught up!'}
           </p>
         </div>

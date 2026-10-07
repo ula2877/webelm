@@ -381,10 +381,10 @@ export default function CreateSuratJenis({ jenisKey }) {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h2 className="text-2xl font-bold text-text-primary">
+            <h2 className="page-title">
               {isEditMode ? `Edit ${cfg.label}` : `Buat ${cfg.label}`}
             </h2>
-            <p className="text-text-secondary mt-1">
+            <p className="page-subtitle">
               {isEditMode
                 ? `Ubah ${cfg.label.toLowerCase()} dengan live preview`
                 : `Susun ${cfg.label.toLowerCase()} dengan live preview`}

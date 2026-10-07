@@ -209,8 +209,8 @@ export default function SuratQuotation() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-text-primary">Surat Penawaran</h2>
-          <p className="text-text-secondary mt-1">Kelola surat penawaran</p>
+          <h2 className="page-title">Surat Penawaran</h2>
+          <p className="page-subtitle">Kelola surat penawaran</p>
         </div>
         <Button icon={Plus} onClick={() => navigate('/letters/quotation/create')}>
           Buat Surat Penawaran

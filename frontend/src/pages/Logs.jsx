@@ -39,8 +39,8 @@ export default function Logs() {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-text-primary">System Logs</h2>
-        <p className="text-text-secondary mt-1">Monitor system events and troubleshoot issues</p>
+        <h2 className="page-title">System Logs</h2>
+        <p className="page-subtitle">Monitor system events and troubleshoot issues</p>
       </div>
 
       {/* Filters */}

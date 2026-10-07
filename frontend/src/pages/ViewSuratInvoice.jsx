@@ -78,8 +78,8 @@ export default function ViewSuratInvoice() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h2 className="text-2xl font-bold text-text-primary">Lihat Invoice</h2>
-            <p className="text-text-secondary mt-1">
+            <h2 className="page-title">Lihat Invoice</h2>
+            <p className="page-subtitle">
               {form?.nomor || 'Memuat...'}
             </p>
           </div>

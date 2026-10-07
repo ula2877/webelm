@@ -26,8 +26,8 @@ export default function Activity() {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-text-primary">Activity Log</h2>
-        <p className="text-text-secondary mt-1">Track all system activities and events</p>
+        <h2 className="page-title">Activity Log</h2>
+        <p className="page-subtitle">Track all system activities and events</p>
       </div>
 
       {/* Activity Timeline */}

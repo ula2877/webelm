@@ -626,8 +626,8 @@ export default function CreateSuratQuotation() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h2 className="text-2xl font-bold text-text-primary">{isEditMode ? 'Edit Surat Penawaran' : 'Buat Surat Penawaran'}</h2>
-            <p className="text-text-secondary mt-1">{isEditMode ? 'Ubah surat penawaran dengan live preview' : 'Susun penawaran dengan live preview'}</p>
+            <h2 className="page-title">{isEditMode ? 'Edit Surat Penawaran' : 'Buat Surat Penawaran'}</h2>
+            <p className="page-subtitle">{isEditMode ? 'Ubah surat penawaran dengan live preview' : 'Susun penawaran dengan live preview'}</p>
           </div>
         </div>
         <div className="flex gap-3">

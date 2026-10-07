@@ -86,7 +86,7 @@ export default function Login() {
           </div>
 
           <div className="mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold text-text-primary mb-2">Sign in</h2>
+            <h2 className="page-title">Sign in</h2>
             <p className="text-text-secondary">Enter your credentials to access your account</p>
           </div>
 

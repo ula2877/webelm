@@ -225,8 +225,8 @@ export default function EditUser() {
 
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-text-primary">Edit User</h2>
-        <p className="text-text-secondary mt-1">Edit user information</p>
+        <h2 className="page-title">Edit User</h2>
+        <p className="page-subtitle">Edit user information</p>
       </div>
 
       {/* Notice */}

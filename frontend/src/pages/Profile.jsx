@@ -340,8 +340,8 @@ export default function Profile() {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-text-primary">Profile</h2>
-        <p className="text-text-secondary mt-1">View and manage your profile information</p>
+        <h2 className="page-title">Profile</h2>
+        <p className="page-subtitle">View and manage your profile information</p>
       </div>
 
       {notice && (

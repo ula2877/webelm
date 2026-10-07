@@ -36,8 +36,8 @@ export default function Settings() {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-text-primary">Settings</h2>
-        <p className="text-text-secondary mt-1">Manage your account settings and preferences</p>
+        <h2 className="page-title">Settings</h2>
+        <p className="page-subtitle">Manage your account settings and preferences</p>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">

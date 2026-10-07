@@ -503,8 +503,8 @@ export default function CreateSuratInvoice() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h2 className="text-2xl font-bold text-text-primary">{isEditMode ? 'Edit Invoice' : 'Buat Invoice'}</h2>
-            <p className="text-text-secondary mt-1">{isEditMode ? 'Ubah invoice dengan live preview' : 'Susun invoice dengan live preview'}</p>
+            <h2 className="page-title">{isEditMode ? 'Edit Invoice' : 'Buat Invoice'}</h2>
+            <p className="page-subtitle">{isEditMode ? 'Ubah invoice dengan live preview' : 'Susun invoice dengan live preview'}</p>
           </div>
         </div>
         <div className="flex gap-3">

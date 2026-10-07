@@ -25,8 +25,8 @@ export default function Analytics() {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-text-primary">Analytics</h2>
-        <p className="text-text-secondary mt-1">Detailed insights and performance metrics</p>
+        <h2 className="page-title">Analytics</h2>
+        <p className="page-subtitle">Detailed insights and performance metrics</p>
       </div>
 
       {/* Charts */}

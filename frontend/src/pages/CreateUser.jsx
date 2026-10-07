@@ -189,8 +189,8 @@ export default function CreateUser() {
 
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-text-primary">Create User</h2>
-        <p className="text-text-secondary mt-1">Create a new user account</p>
+        <h2 className="page-title">Create User</h2>
+        <p className="page-subtitle">Create a new user account</p>
       </div>
 
       {/* Notice */}

@@ -102,8 +102,8 @@ export default function DataManagement() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-text-primary">Data Management</h2>
-          <p className="text-text-secondary mt-1">Manage your data files and resources</p>
+          <h2 className="page-title">Data Management</h2>
+          <p className="page-subtitle">Manage your data files and resources</p>
         </div>
         <div className="flex gap-3">
           <Button variant="secondary" icon={Upload}>Import</Button>

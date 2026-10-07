@@ -214,8 +214,8 @@ export default function SuratJenisPage({ jenisKey, jenisLabel, createLabel }) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-text-primary">{jenisLabel}</h2>
-          <p className="text-text-secondary mt-1">Kelola {jenisLabel.toLowerCase()}</p>
+          <h2 className="page-title">{jenisLabel}</h2>
+          <p className="page-subtitle">Kelola {jenisLabel.toLowerCase()}</p>
         </div>
         <Button icon={Plus} onClick={() => navigate(`/${cfg.routeBase}/create`)}>
           {createLabel}

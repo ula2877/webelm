@@ -124,8 +124,8 @@ export default function Surat() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-text-primary">Surat</h2>
-          <p className="text-text-secondary mt-1">Kelola surat masuk dan keluar</p>
+          <h2 className="page-title">Surat</h2>
+          <p className="page-subtitle">Kelola surat masuk dan keluar</p>
         </div>
         <Button icon={Plus}>Buat Surat</Button>
       </div>

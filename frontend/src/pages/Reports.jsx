@@ -58,8 +58,8 @@ export default function Reports() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-text-primary">Reports</h2>
-          <p className="text-text-secondary mt-1">Generate and manage your reports</p>
+          <h2 className="page-title">Reports</h2>
+          <p className="page-subtitle">Generate and manage your reports</p>
         </div>
         <div className="flex gap-3">
           <Button variant="secondary" icon={FileSpreadsheet} onClick={handleExportCSV}>

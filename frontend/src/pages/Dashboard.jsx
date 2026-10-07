@@ -27,8 +27,8 @@ export default function Dashboard() {
     <div className="space-y-6 animate-fade-in">
       {/* Welcome section */}
       <div>
-        <h2 className="text-2xl font-bold text-text-primary">Welcome back, Admin</h2>
-        <p className="text-text-secondary mt-1">Here&apos;s what&apos;s happening today.</p>
+        <h2 className="page-title">Welcome back, Admin</h2>
+        <p className="page-subtitle">Here&apos;s what&apos;s happening today.</p>
       </div>
 
       {/* Stats cards */}
