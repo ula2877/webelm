@@ -27,7 +27,7 @@ export { rupiah, validateImageFile } from './quotation';
 export const SURAT_JENIS = {
   'delivery-note': {
     label: 'Surat Jalan',
-    routeBase: 'delivery-note',
+    routeBase: 'letters/delivery-note',
     searchPlaceholder: 'Cari surat jalan...',
     pdfPrefix: 'Surat-Jalan',
     nomorPrefix: 'SJ',
@@ -36,7 +36,7 @@ export const SURAT_JENIS = {
   },
   bast: {
     label: 'Berita Acara Serah Terima',
-    routeBase: 'handover',
+    routeBase: 'letters/handover',
     searchPlaceholder: 'Cari berita acara...',
     pdfPrefix: 'BAST',
     nomorPrefix: 'BA',
@@ -45,7 +45,7 @@ export const SURAT_JENIS = {
   },
   'inspection-request': {
     label: 'Surat Permohonan Pemeriksaan Hasil Pekerjaan',
-    routeBase: 'inspection-request',
+    routeBase: 'letters/inspection-request',
     searchPlaceholder: 'Cari surat permohonan pemeriksaan...',
     pdfPrefix: 'Surat-Permohonan-Pemeriksaan',
     nomorPrefix: 'PP',
@@ -54,7 +54,7 @@ export const SURAT_JENIS = {
   },
   'payment-request': {
     label: 'Surat Permohonan Pembayaran',
-    routeBase: 'payment-request',
+    routeBase: 'letters/payment-request',
     searchPlaceholder: 'Cari surat permohonan pembayaran...',
     pdfPrefix: 'Surat-Permohonan-Pembayaran',
     nomorPrefix: 'PB',
@@ -63,7 +63,7 @@ export const SURAT_JENIS = {
   },
   kuitansi: {
     label: 'Kuitansi',
-    routeBase: 'receipt',
+    routeBase: 'letters/receipt',
     searchPlaceholder: 'Cari kuitansi...',
     pdfPrefix: 'Kuitansi',
     nomorPrefix: 'KWT',
@@ -76,7 +76,7 @@ export function suratJenisConfig(jenisKey) {
   return (
     SURAT_JENIS[jenisKey] || {
       label: 'Surat',
-      routeBase: jenisKey,
+      routeBase: `letters/${jenisKey}`,
       searchPlaceholder: 'Cari surat...',
       pdfPrefix: 'Surat',
       nomorPrefix: 'SRT',
