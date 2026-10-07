@@ -49,7 +49,8 @@ export const SURAT_JENIS = {
     routeBase: 'letters/inspection-request',
     searchPlaceholder: 'Cari surat permohonan pemeriksaan...',
     pdfPrefix: 'Surat-Permohonan-Pemeriksaan',
-    nomorPrefix: 'PP',
+    // Prefix mengikuti dokumen referensi: KTR/DDMM[urutan]/ELMECH/YYYY
+    nomorPrefix: 'KTR',
     docTitle: 'SURAT PERMOHONAN PEMERIKSAAN',
     emptyTitle: 'Tidak ada surat permohonan pemeriksaan',
   },

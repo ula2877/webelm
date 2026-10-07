@@ -55,7 +55,7 @@ class SuratController extends Controller
     private const SURAT_JENIS_PREFIX = [
         'delivery-note' => 'SJ',
         'bast' => 'BAST',
-        'inspection-request' => 'PP',
+        'inspection-request' => 'KTR',
         'payment-request' => 'PB',
         'kuitansi' => 'KWT',
     ];
@@ -875,23 +875,26 @@ class SuratController extends Controller
 
         $isDeliveryNote = $jenis === 'delivery-note';
         $isBast = $jenis === 'bast';
+        $isInspection = $jenis === 'inspection-request';
 
-        // Surat Jalan & BAST tidak punya field "Perihal" di formnya, jadi
-        // dibuat opsional agar submit tidak ditolak 422. Jenis surat lain
-        // yang masih menampilkan input Perihal tetap wajib.
-        $subjectRules = ($isDeliveryNote || $isBast)
+        // Surat Jalan, BAST & Permohonan Pemeriksaan tidak punya field
+        // "Perihal" yang bisa diisi user, jadi dibuat opsional agar submit
+        // tidak ditolak 422. Jenis surat lain tetap wajib.
+        $subjectRules = ($isDeliveryNote || $isBast || $isInspection)
             ? ['nullable', 'string', 'max:255']
             : ['required', 'string', 'max:255'];
 
-        // BAST memakai satuan seperti "Unit"/"Set" yang tidak ada di
-        // whitelist surat lain, dan volume boleh kosong.
-        $satuanRules = $isBast
+        // BAST & Permohonan Pemeriksaan tidak memakai harga: satuan bebas
+        // (mis. "Unit"/"Set"), volume boleh kosong, alamat boleh kosong,
+        // dan penandatangan tidak dipaksa terisi.
+        $noHarga = $isBast || $isInspection;
+        $satuanRules = $noHarga
             ? ['nullable', 'string', 'max:50']
             : ['required', 'string', 'in:PCS,Paket,OH,LS'];
-        $volumeRules = $isBast
+        $volumeRules = $noHarga
             ? ['nullable', 'numeric', 'min:0', 'max:999999999999']
             : ['required', 'numeric', 'gt:0', 'max:999999999999'];
-        $addressRules = $isBast
+        $addressRules = $noHarga
             ? ['nullable', 'string']
             : ['required', 'string'];
 
@@ -918,6 +921,16 @@ class SuratController extends Controller
             'pihakPertamaPenandatangan' => ['nullable', 'string', 'max:255'],
             'signatureSide' => ['nullable', 'in:first,second'],
             'sumberSuratJalanId' => ['nullable', 'integer'],
+            // Field khusus Surat Permohonan Pemeriksaan Hasil Pekerjaan.
+            'sumberId' => ['nullable', 'integer'],
+            'sumberJenis' => ['nullable', 'string', 'max:50'],
+            'lampiran' => ['nullable', 'string', 'max:100'],
+            'tujuanJabatan' => ['nullable', 'string', 'max:255'],
+            'tujuanInstansi' => ['nullable', 'string', 'max:255'],
+            'tujuanAlamat' => ['nullable', 'string'],
+            'namaPekerjaan' => ['nullable', 'string', 'max:500'],
+            'nomorSPK' => ['nullable', 'string', 'max:255'],
+            'tanggalSPK' => ['nullable', 'date'],
             'notes' => ['nullable', 'array'],
             'notes.*' => ['string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
@@ -940,7 +953,7 @@ class SuratController extends Controller
             'stampPosition.zoom' => ['nullable', 'numeric', 'min:0.1', 'max:3'],
             'signature' => ['nullable', 'array'],
             'signature.companyName' => ['nullable', 'string', 'max:255'],
-            'signature.signerName' => $isBast
+            'signature.signerName' => $noHarga
                 ? ['nullable', 'string', 'max:255']
                 : ['required', 'string', 'max:255'],
             'signature.signerTitle' => ['nullable', 'string', 'max:100'],
@@ -1004,10 +1017,10 @@ class SuratController extends Controller
         $itemRows = [];
         $total = 0;
         foreach ($validated['items'] as $index => $item) {
-            // BAST & Surat Jalan tidak memakai harga -> volume boleh kosong.
+            // BAST & Permohonan Pemeriksaan tidak memakai harga.
             $volume = isset($item['volume']) ? (float) $item['volume'] : 0;
             $harga = isset($item['harga_satuan']) ? (float) $item['harga_satuan'] : 0;
-            if (!$isDeliveryNote && !$isBast) {
+            if (!$isDeliveryNote && !$noHarga) {
                 $total += (int) round($volume * $harga);
             }
 
@@ -1026,9 +1039,9 @@ class SuratController extends Controller
                 'nama_komponen' => $item['nama_komponen'],
                 'spesifikasi' => $specs === [] ? null : json_encode($specs),
                 'volume' => $volume,
-                // BAST & Surat Jalan tidak menyimpan satuan kosong.
+                // BAST & Permohonan Pemeriksaan tidak menyimpan satuan kosong.
                 'satuan' => ($item['satuan'] ?? '') === '' ? null : $item['satuan'],
-                'harga_satuan' => ($isDeliveryNote || $isBast) ? 0 : (int) round($harga),
+                'harga_satuan' => ($isDeliveryNote || $noHarga) ? 0 : (int) round($harga),
                 'data' => null,
             ];
         }
@@ -1096,6 +1109,20 @@ class SuratController extends Controller
             $dataJson['pihakKeduaAlamat'] = $validated['pihakKeduaAlamat'] ?? null;
             $dataJson['pihakPertamaPenandatangan'] = $validated['pihakPertamaPenandatangan'] ?? null;
             $dataJson['signatureSide'] = $validated['signatureSide'] ?? 'second';
+        }
+
+        // Field khusus Permohonan Pemeriksaan -> JSON `data` yang sama.
+        if ($isInspection) {
+            $dataJson['sumberId'] = $validated['sumberId'] ?? null;
+            $dataJson['sumberJenis'] = $validated['sumberJenis'] ?? null;
+            $dataJson['lampiran'] = $validated['lampiran'] ?? null;
+            $dataJson['perihal'] = $validated['subject'] ?? '';
+            $dataJson['tujuanJabatan'] = $validated['tujuanJabatan'] ?? null;
+            $dataJson['tujuanInstansi'] = $validated['tujuanInstansi'] ?? null;
+            $dataJson['tujuanAlamat'] = $validated['tujuanAlamat'] ?? null;
+            $dataJson['namaPekerjaan'] = $validated['namaPekerjaan'] ?? null;
+            $dataJson['nomorSPK'] = $validated['nomorSPK'] ?? null;
+            $dataJson['tanggalSPK'] = $validated['tanggalSPK'] ?? null;
         }
 
         try {
