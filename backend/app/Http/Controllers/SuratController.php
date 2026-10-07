@@ -876,9 +876,10 @@ class SuratController extends Controller
         $isDeliveryNote = $jenis === 'delivery-note';
         $isBast = $jenis === 'bast';
 
-        // Surat Jalan tidak memakai field "Perihal", jadi opsional agar
-        // form tetap bisa disimpan. Jenis surat lain tetap wajib.
-        $subjectRules = $isDeliveryNote
+        // Surat Jalan & BAST tidak punya field "Perihal" di formnya, jadi
+        // dibuat opsional agar submit tidak ditolak 422. Jenis surat lain
+        // yang masih menampilkan input Perihal tetap wajib.
+        $subjectRules = ($isDeliveryNote || $isBast)
             ? ['nullable', 'string', 'max:255']
             : ['required', 'string', 'max:255'];
 
