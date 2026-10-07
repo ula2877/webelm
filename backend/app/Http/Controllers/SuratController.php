@@ -894,11 +894,17 @@ class SuratController extends Controller
             'items.*.satuan' => ['required', 'string', 'in:PCS,Paket,OH,LS'],
             'items.*.harga_satuan' => ['nullable', 'numeric', 'min:0', 'max:999999999999'],
             'useSignature' => ['sometimes', 'boolean'],
+            'useStamp' => ['sometimes', 'boolean'],
             'signature_asset_id' => ['nullable', 'integer'],
+            'stamp_asset_id' => ['nullable', 'integer'],
             'signaturePosition' => ['nullable', 'array'],
             'signaturePosition.x' => ['nullable', 'numeric'],
             'signaturePosition.y' => ['nullable', 'numeric'],
             'signaturePosition.zoom' => ['nullable', 'numeric', 'min:0.1', 'max:3'],
+            'stampPosition' => ['nullable', 'array'],
+            'stampPosition.x' => ['nullable', 'numeric'],
+            'stampPosition.y' => ['nullable', 'numeric'],
+            'stampPosition.zoom' => ['nullable', 'numeric', 'min:0.1', 'max:3'],
             'signature' => ['nullable', 'array'],
             'signature.companyName' => ['nullable', 'string', 'max:255'],
             'signature.signerName' => ['required', 'string', 'max:255'],
@@ -941,6 +947,21 @@ class SuratController extends Controller
             if (!$signatureAsset) {
                 throw ValidationException::withMessages([
                     'signature_asset_id' => ['Asset tanda tangan tidak valid.'],
+                ]);
+            }
+        }
+
+        $stampAssetId = !empty($validated['stamp_asset_id']) ? (int) $validated['stamp_asset_id'] : null;
+        $stampAsset = null;
+        if ($stampAssetId !== null) {
+            $stampAsset = DB::table('tb_surat_asset')
+                ->where('id_asset', $stampAssetId)
+                ->where('jenis', 'stamp')
+                ->whereNull('deleted_at')
+                ->first();
+            if (!$stampAsset) {
+                throw ValidationException::withMessages([
+                    'stamp_asset_id' => ['Asset stempel tidak valid.'],
                 ]);
             }
         }
@@ -988,6 +1009,11 @@ class SuratController extends Controller
             ? $position(is_array($validated['signaturePosition'] ?? null) ? $validated['signaturePosition'] : null)
             : null;
 
+        $useStamp = !empty($validated['useStamp']);
+        $posStempel = $useStamp
+            ? $position(is_array($validated['stampPosition'] ?? null) ? $validated['stampPosition'] : null)
+            : null;
+
         $signatureBlock = is_array($validated['signature'] ?? null) ? $validated['signature'] : [];
 
         $dataJson = [
@@ -999,9 +1025,12 @@ class SuratController extends Controller
             'nomorPO' => $validated['nomorPO'] ?? null,
             'receiverName' => $validated['receiverName'] ?? null,
             'useSignature' => $useSignature,
-            'useSignatureStamp' => $useSignature,
+            'useStamp' => $useStamp,
+            'useSignatureStamp' => ($useSignature || $useStamp),
             'signatureImage' => $signatureAsset ? $signatureAsset->path : null,
+            'stampImage' => $stampAsset ? $stampAsset->path : null,
             'signaturePosition' => $posTtd,
+            'stampPosition' => $posStempel,
             'signature' => [
                 'companyName' => (string) ($signatureBlock['companyName'] ?? ''),
                 'signerName' => (string) ($signatureBlock['signerName'] ?? ''),
@@ -1017,7 +1046,7 @@ class SuratController extends Controller
         ];
 
         try {
-            $idSurat = DB::transaction(function () use ($existing, $validated, $total, $dataJson, $signatureAssetId, $useSignature, $posTtd, $itemRows, $jenis) {
+            $idSurat = DB::transaction(function () use ($existing, $validated, $total, $dataJson, $signatureAssetId, $stampAssetId, $useSignature, $useStamp, $posTtd, $posStempel, $itemRows, $jenis) {
                 if ($existing) {
                     $id = (int) $existing->id_surat;
                     DB::table('tb_surat')->where('id_surat', $id)->update([
@@ -1027,8 +1056,10 @@ class SuratController extends Controller
                         'data' => json_encode($dataJson),
                         'updated_at' => now(),
                         'id_asset_ttd' => $signatureAssetId,
-                        'use_signature_stamp' => $useSignature ? 1 : 0,
+                        'id_asset_stempel' => $stampAssetId,
+                        'use_signature_stamp' => ($useSignature || $useStamp) ? 1 : 0,
                         'posisi_ttd' => $posTtd !== null ? json_encode($posTtd) : null,
+                        'posisi_stempel' => $posStempel !== null ? json_encode($posStempel) : null,
                     ]);
                     DB::table('tb_surat_item')->where('id_surat', $id)->delete();
                 } else {
@@ -1051,10 +1082,10 @@ class SuratController extends Controller
                         'created_at' => now(),
                         'updated_at' => now(),
                         'id_asset_ttd' => $signatureAssetId,
-                        'id_asset_stempel' => null,
-                        'use_signature_stamp' => $useSignature ? 1 : 0,
+                        'id_asset_stempel' => $stampAssetId,
+                        'use_signature_stamp' => ($useSignature || $useStamp) ? 1 : 0,
                         'posisi_ttd' => $posTtd !== null ? json_encode($posTtd) : null,
-                        'posisi_stempel' => null,
+                        'posisi_stempel' => $posStempel !== null ? json_encode($posStempel) : null,
                     ]);
                 }
 

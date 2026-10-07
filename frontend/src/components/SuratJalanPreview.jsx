@@ -35,40 +35,19 @@ export default function SuratJalanPreview({ form }) {
   const [measurements, setMeasurements] = useState(null);
 
   const renderInfo = () => (
-    <div className="sj-info-section">
-      <div className="sj-info-recipient">
-        <p>Kepada Yth:</p>
-        <p className="recipient-name">{form.customerName || '-'}</p>
-        <p className="recipient-address">{form.customerAddress || '-'}</p>
-      </div>
-      <div className="sj-info-meta">
-        <h1 className="invoice-title">SURAT JALAN</h1>
-        <table className="sj-info-meta-table">
+    <div className="letter-invoice-header-block">
+      <h1 className="invoice-title">SURAT JALAN</h1>
+      <div className="letter-invoice-header">
+        <div className="letter-invoice-customer">
+          <p className="customer-name">{form.customerName || '-'}</p>
+          <p className="customer-address">{form.customerAddress || '-'}</p>
+        </div>
+        <table className="letter-invoice-meta">
           <tbody>
-            <tr>
-              <td className="w-[32mm]">Tgl. Surat</td>
-              <td className="w-[3mm]">:</td>
-              <td>{longDate}</td>
-            </tr>
-            <tr>
-              <td>No. Surat</td>
-              <td>:</td>
-              <td>{form.nomor || '-'}</td>
-            </tr>
-            {form.nomorPenawaran && (
-              <tr>
-                <td>Nomor Penawaran</td>
-                <td>:</td>
-                <td>{form.nomorPenawaran}</td>
-              </tr>
-            )}
-            {form.nomorPO && (
-              <tr>
-                <td>Nomor PO/SPK</td>
-                <td>:</td>
-                <td>{form.nomorPO}</td>
-              </tr>
-            )}
+            <tr><td className="w-[32mm]">Tgl. Invoice</td><td className="w-[3mm]">:</td><td>{longDate}</td></tr>
+            <tr><td>No. Invoice</td><td>:</td><td>{form.nomor || '-'}</td></tr>
+            <tr><td>Nomor Penawaran</td><td>:</td><td>{form.nomorPenawaran || '-'}</td></tr>
+            <tr><td>Nomor PO/SPK</td><td>:</td><td>{form.nomorPo || '-'}</td></tr>
           </tbody>
         </table>
       </div>
@@ -133,13 +112,25 @@ export default function SuratJalanPreview({ form }) {
     <div className="sj-signature-section">
       <div className="sj-signature-left">
         <p className="font-semibold">Diterima Oleh:</p>
+        <br></br>
         <div className="sj-signature-box" />
-        <p className="sj-signature-name">{form.receiverName || ''}</p>
+        <p className="sj-signature-name">{form.receiverName || '__________________'}</p>
       </div>
       <div className="sj-signature-right">
         <p className="font-semibold">Hormat Kami,</p>
-        <p className="sj-company-name">{form.companyName || '-'}</p>
+        <br></br>
         <div className="sj-signature-box">
+          {form.useStamp && form.stampImage ? (
+            <img
+              src={form.stampImage}
+              alt="Stempel"
+              style={{
+                transform: `translate(${Number(form.stampX) || 0}px, ${
+                  Number(form.stampY) || 0
+                }px) scale(${(Number(form.stampZoom) || 100) / 100})`,
+              }}
+            />
+          ) : null}
           {form.useSignature && form.signatureImage ? (
             <img
               src={form.signatureImage}
@@ -153,7 +144,7 @@ export default function SuratJalanPreview({ form }) {
           ) : null}
         </div>
         <p className="sj-signature-name">{form.signerName || '-'}</p>
-        <p className="sj-signature-title">{form.signerTitle || '-'}</p>
+        <p className="sj-company-name">{form.signerTitle || '-'} {form.companyName || '-'}</p>
       </div>
     </div>
   );

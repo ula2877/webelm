@@ -433,7 +433,7 @@ body {
 }
 .sj-signature-box img {
   position: absolute;
-  left: 50%;
+  left: 0;
   top: 0;
   max-height: 22mm;
   width: auto;

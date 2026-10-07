@@ -116,6 +116,11 @@ export function createInitialSuratJenisForm() {
     signatureX: 0,
     signatureY: 0,
     signatureZoom: 100,
+    useStamp: false,
+    stampImage: null,
+    stampX: 0,
+    stampY: 25,
+    stampZoom: 100,
     companyName: 'CV. Elmech Technology Indonesia',
     signerName: 'Muhammad Taufiq Rahman',
     signerTitle: 'Direktur',
@@ -153,6 +158,11 @@ export function buildSuratJenisPayload(form, assetIds = {}) {
     signature_asset_id: assetIds.signature || null,
     signaturePosition: form.useSignature
       ? position(form.signatureX, form.signatureY, form.signatureZoom)
+      : null,
+    useStamp: !!form.useStamp,
+    stamp_asset_id: assetIds.stamp || null,
+    stampPosition: form.useStamp
+      ? position(form.stampX, form.stampY, form.stampZoom)
       : null,
     signature: {
       companyName: form.companyName || '',
@@ -211,6 +221,7 @@ export function formFromSuratJenisDetail(detail) {
     };
   };
   const sigPos = pos(detail.posisi_ttd ?? d.signaturePosition);
+  const stampPos = pos(detail.posisi_stempel ?? d.stampPosition);
 
   return {
     nomor: detail.nomor || '',
@@ -239,6 +250,11 @@ export function formFromSuratJenisDetail(detail) {
     signatureX: sigPos.x,
     signatureY: sigPos.y,
     signatureZoom: sigPos.zoom,
+    useStamp: !!d.useStamp,
+    stampImage: d.stampImage ?? null,
+    stampX: stampPos.x,
+    stampY: stampPos.y,
+    stampZoom: stampPos.zoom,
     companyName: d.signature?.companyName ?? '',
     signerName: d.signature?.signerName ?? '',
     signerTitle: d.signature?.signerTitle ?? '',

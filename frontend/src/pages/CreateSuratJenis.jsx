@@ -64,7 +64,7 @@ export default function CreateSuratJenis({ jenisKey }) {
   // ID asset (tb_surat_asset) untuk tanda tangan.
   // null = tidak pakai / belum dipilih. Hanya ID-nya
   // yang dikirim ke backend (id_asset_ttd).
-  const [assetIds, setAssetIds] = useState({ signature: null });
+  const [assetIds, setAssetIds] = useState({ signature: null, stamp: null });
 
   // ---- Surat Jalan: daftar Surat Penawaran untuk "Ambil dari Surat Penawaran" ----
   const isDeliveryNote = jenisKey === 'delivery-note';
@@ -247,7 +247,7 @@ export default function CreateSuratJenis({ jenisKey }) {
           return;
         }
         const s = res.data;
-        setAssetIds({ signature: s.id_asset_ttd ?? null });
+        setAssetIds({ signature: s.id_asset_ttd ?? null, stamp: s.id_asset_stempel ?? null });
         setForm((prev) => ({ ...prev, ...formFromSuratJenisDetail(s) }));
       })
       .catch((err) => {
@@ -265,72 +265,73 @@ export default function CreateSuratJenis({ jenisKey }) {
   // Files are uploaded to the server (recorded in tb_surat_asset). The stored
   // absolute URL is kept in the form state and shown in the Live Preview.
   const [imageErrors, setImageErrors] = useState({});
-  const [assets, setAssets] = useState({ signature: [] });
-  const [assetsLoading, setAssetsLoading] = useState({ signature: false });
-  const [uploading, setUploading] = useState({ signature: false });
+  const [assets, setAssets] = useState({ signature: [], stamp: [] });
+  const [assetsLoading, setAssetsLoading] = useState({ signature: false, stamp: false });
+  const [uploading, setUploading] = useState({ signature: false, stamp: false });
 
-  const loadAssets = useCallback(async () => {
-    setAssetsLoading((prev) => ({ ...prev, signature: true }));
+  const loadAssets = useCallback(async (jenis) => {
+    setAssetsLoading((prev) => ({ ...prev, [jenis]: true }));
     try {
-      const res = await suratService.fetchSuratAssets('signature');
+      const res = await suratService.fetchSuratAssets(jenis);
       if (res.status === 'ok') {
-        setAssets((prev) => ({ ...prev, signature: res.data || [] }));
+        setAssets((prev) => ({ ...prev, [jenis]: res.data || [] }));
       }
     } catch (err) {
       showNotice('error', err.message || 'Gagal memuat asset sebelumnya.');
     } finally {
-      setAssetsLoading((prev) => ({ ...prev, signature: false }));
+      setAssetsLoading((prev) => ({ ...prev, [jenis]: false }));
     }
   }, [showNotice]);
 
-  // Load the previously stored signature list once on mount.
+  // Load the previously stored signature/stamp lists once on mount.
   useEffect(() => {
-    loadAssets();
+    loadAssets('signature');
+    loadAssets('stamp');
   }, [loadAssets]);
 
   const handleUploadAsset = useCallback(
-    async (file) => {
+    async (jenis, field, errorKey, file) => {
       const err = validateImageFile(file);
       if (err) {
-        setImageErrors((prev) => ({ ...prev, signature: err }));
+        setImageErrors((prev) => ({ ...prev, [errorKey]: err }));
         return;
       }
-      setImageErrors((prev) => ({ ...prev, signature: null }));
-      setUploading((prev) => ({ ...prev, signature: true }));
+      setImageErrors((prev) => ({ ...prev, [errorKey]: null }));
+      setUploading((prev) => ({ ...prev, [jenis]: true }));
       try {
-        const res = await suratService.uploadSuratAsset('signature', file);
+        const res = await suratService.uploadSuratAsset(jenis, file);
         if (res.status === 'ok' && res.data?.url) {
-          setForm((prev) => ({ ...prev, signatureImage: res.data.url }));
+          setForm((prev) => ({ ...prev, [field]: res.data.url }));
           // Simpan ID asset-nya (bukan URL) untuk dikirim ke backend.
-          setAssetIds((prev) => ({ ...prev, signature: res.data.id ?? null }));
+          setAssetIds((prev) => ({ ...prev, [jenis]: res.data.id ?? null }));
           // Refresh the "file sebelumnya" list so the new asset appears there.
-          loadAssets();
+          loadAssets(jenis);
         } else {
-          setImageErrors((prev) => ({ ...prev, signature: 'Gagal mengunggah file.' }));
+          setImageErrors((prev) => ({ ...prev, [errorKey]: 'Gagal mengunggah file.' }));
         }
       } catch (uploadErr) {
         setImageErrors((prev) => ({
           ...prev,
-          signature: uploadErr.message || 'Gagal mengunggah file.',
+          [errorKey]: uploadErr.message || 'Gagal mengunggah file.',
         }));
       } finally {
-        setUploading((prev) => ({ ...prev, signature: false }));
+        setUploading((prev) => ({ ...prev, [jenis]: false }));
       }
     },
     [loadAssets]
   );
 
-  const handleSelectAsset = useCallback((url, assetId) => {
-    setForm((prev) => ({ ...prev, signatureImage: url }));
+  const handleSelectAsset = useCallback((field, url, assetId) => {
+    setForm((prev) => ({ ...prev, [field]: url }));
     // Pilih asset existing = pakai ID asset yang sudah ada di tb_surat_asset.
-    setAssetIds((prev) => ({ ...prev, signature: assetId ?? null }));
+    setAssetIds((prev) => ({ ...prev, [field === 'signatureImage' ? 'signature' : 'stamp']: assetId ?? null }));
   }, []);
 
   // Assets are chosen by URL; "Hapus" only detaches it from this form. The
   // stored record in tb_surat_asset is never deleted (reusable on other letters).
-  const handleImageRemove = useCallback(() => {
-    setForm((prev) => ({ ...prev, signatureImage: null }));
-    setAssetIds((prev) => ({ ...prev, signature: null }));
+  const handleImageRemove = useCallback((field) => {
+    setForm((prev) => ({ ...prev, [field]: null }));
+    setAssetIds((prev) => ({ ...prev, [field === 'signatureImage' ? 'signature' : 'stamp']: null }));
   }, []);
 
   // ---------------------------------------------------------------- items
@@ -739,70 +740,74 @@ export default function CreateSuratJenis({ jenisKey }) {
               </Section>
             )}
 
-            {/* 5. Keterangan */}
-            <Section title="Keterangan">
-              <div className="space-y-4">
-                {form.notes.map((note, index) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <div className="flex-1">
-                      <Textarea
-                        rows={2}
-                        value={note}
-                        onChange={(e) => updateNote(index, e.target.value)}
-                        placeholder="Masukkan keterangan"
-                      />
+            {/* 5. Keterangan (tidak dipakai Surat Jalan) */}
+            {!isDeliveryNote && (
+              <Section title="Keterangan">
+                <div className="space-y-4">
+                  {form.notes.map((note, index) => (
+                    <div key={index} className="flex items-start gap-2">
+                      <div className="flex-1">
+                        <Textarea
+                          rows={2}
+                          value={note}
+                          onChange={(e) => updateNote(index, e.target.value)}
+                          placeholder="Masukkan keterangan"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeNote(index)}
+                        className="mt-6 p-2 rounded-lg text-text-muted hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Hapus Keterangan"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removeNote(index)}
-                      className="mt-6 p-2 rounded-lg text-text-muted hover:text-red-600 hover:bg-red-50 transition-colors"
-                      title="Hapus Keterangan"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4">
-                <Button type="button" variant="secondary" size="sm" icon={Plus} onClick={addNote}>
-                  Tambah Keterangan
-                </Button>
-              </div>
-            </Section>
+                  ))}
+                </div>
+                <div className="mt-4">
+                  <Button type="button" variant="secondary" size="sm" icon={Plus} onClick={addNote}>
+                    Tambah Keterangan
+                  </Button>
+                </div>
+              </Section>
+            )}
 
             {/* 6. Informasi Penandatangan */}
             <Section title="Informasi Penandatangan">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
+                  <Input
+                    label="Nama Perusahaan"
+                    value={form.companyName}
+                    onChange={(e) => setField('companyName', e.target.value)}
+                    placeholder="Masukkan nama perusahaan"
+                  />
+                </div>
+                <Input
+                  label="Nama Penandatangan"
+                  value={form.signerName}
+                  onChange={(e) => setField('signerName', e.target.value)}
+                  error={errors.signerName}
+                  placeholder="Masukkan nama penandatangan"
+                />
+                <Input
+                  label="Jabatan"
+                  value={form.signerTitle}
+                  onChange={(e) => setField('signerTitle', e.target.value)}
+                  placeholder="Masukkan jabatan"
+                />
+
+                {/* Tanda tangan */}
+                <div className="sm:col-span-2 border-t border-border pt-4">
                   <Toggle
                     checked={form.useSignature}
                     onChange={(v) => setField('useSignature', v)}
                     label="Gunakan Tanda Tangan"
-                    description="Tampilkan tanda tangan pada surat."
+                    description="Tampilkan gambar tanda tangan pada surat."
                   />
-                </div>
-                {form.useSignature && (
-                  <>
-                    <Input
-                      label="Nama Perusahaan"
-                      value={form.companyName}
-                      onChange={(e) => setField('companyName', e.target.value)}
-                      placeholder="Masukkan nama perusahaan"
-                    />
-                    <Input
-                      label="Nama Penandatangan"
-                      value={form.signerName}
-                      onChange={(e) => setField('signerName', e.target.value)}
-                      error={errors.signerName}
-                      placeholder="Masukkan nama penandatangan"
-                    />
-                    <Input
-                      label="Jabatan"
-                      value={form.signerTitle}
-                      onChange={(e) => setField('signerTitle', e.target.value)}
-                      placeholder="Masukkan jabatan"
-                    />
-                    <div className="sm:col-span-2">
+                  {form.useSignature && (
+                    <div className="mt-3">
                       <ImageAssetField
                         label="Tanda tangan"
                         kind="signature"
@@ -814,14 +819,44 @@ export default function CreateSuratJenis({ jenisKey }) {
                         assets={assets.signature}
                         assetsLoading={assetsLoading.signature}
                         uploading={uploading.signature}
-                        onUploadFile={(file) => handleUploadAsset(file)}
-                        onSelectAsset={(asset) => handleSelectAsset(asset.url, asset.id)}
-                        onChange={(key, value) => setField(`signature${key.charAt(0).toUpperCase()}${key.slice(1)}`, value)}
-                        onRemove={() => handleImageRemove()}
+                        onUploadFile={(file) => handleUploadAsset('signature', 'signatureImage', 'signature', file)}
+                        onSelectAsset={(asset) => handleSelectAsset('signatureImage', asset.url, asset.id)}
+                        onChange={(key, value) => setField({ x: 'signatureX', y: 'signatureY', zoom: 'signatureZoom' }[key], value)}
+                        onRemove={() => handleImageRemove('signatureImage')}
                       />
                     </div>
-                  </>
-                )}
+                  )}
+                </div>
+
+                {/* Stempel */}
+                <div className="sm:col-span-2 border-t border-border pt-4">
+                  <Toggle
+                    checked={form.useStamp}
+                    onChange={(v) => setField('useStamp', v)}
+                    label="Gunakan Stempel"
+                    description="Tampilkan gambar stempel pada surat."
+                  />
+                  {form.useStamp && (
+                    <div className="mt-3">
+                      <ImageAssetField
+                        label="Stempel"
+                        kind="stamp"
+                        image={form.stampImage}
+                        x={form.stampX}
+                        y={form.stampY}
+                        zoom={form.stampZoom}
+                        error={imageErrors.stamp}
+                        assets={assets.stamp}
+                        assetsLoading={assetsLoading.stamp}
+                        uploading={uploading.stamp}
+                        onUploadFile={(file) => handleUploadAsset('stamp', 'stampImage', 'stamp', file)}
+                        onSelectAsset={(asset) => handleSelectAsset('stampImage', asset.url, asset.id)}
+                        onChange={(key, value) => setField({ x: 'stampX', y: 'stampY', zoom: 'stampZoom' }[key], value)}
+                        onRemove={() => handleImageRemove('stampImage')}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </Section>
           </div>
