@@ -44,8 +44,8 @@ export default function SuratJalanPreview({ form }) {
         </div>
         <table className="letter-invoice-meta">
           <tbody>
-            <tr><td className="w-[32mm]">Tgl. Invoice</td><td className="w-[3mm]">:</td><td>{longDate}</td></tr>
-            <tr><td>No. Invoice</td><td>:</td><td>{form.nomor || '-'}</td></tr>
+            <tr><td className="w-[32mm]">Tgl. Surat</td><td className="w-[3mm]">:</td><td>{longDate}</td></tr>
+            <tr><td>No. Surat</td><td>:</td><td>{form.nomor || '-'}</td></tr>
             <tr><td>Nomor Penawaran</td><td>:</td><td>{form.nomorPenawaran || '-'}</td></tr>
             <tr><td>Nomor PO/SPK</td><td>:</td><td>{form.nomorPo || '-'}</td></tr>
           </tbody>
@@ -112,13 +112,12 @@ export default function SuratJalanPreview({ form }) {
     <div className="sj-signature-section">
       <div className="sj-signature-left">
         <p className="font-semibold">Diterima Oleh:</p>
-        <br></br>
         <div className="sj-signature-box" />
+        <br></br>
         <p className="sj-signature-name">{form.receiverName || '__________________'}</p>
       </div>
       <div className="sj-signature-right">
         <p className="font-semibold">Hormat Kami,</p>
-        <br></br>
         <div className="sj-signature-box">
           {form.useStamp && form.stampImage ? (
             <img
@@ -143,6 +142,7 @@ export default function SuratJalanPreview({ form }) {
             />
           ) : null}
         </div>
+        <br></br>
         <p className="sj-signature-name">{form.signerName || '-'}</p>
         <p className="sj-company-name">{form.signerTitle || '-'} {form.companyName || '-'}</p>
       </div>

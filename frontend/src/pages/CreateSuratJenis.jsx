@@ -565,15 +565,17 @@ export default function CreateSuratJenis({ jenisKey }) {
                   onChange={(e) => setField('city', e.target.value)}
                   placeholder="Masukkan kota"
                 />
-                <div className="sm:col-span-2">
-                  <Input
-                    label="Perihal"
-                    value={form.subject}
-                    onChange={(e) => setField('subject', e.target.value)}
-                    error={errors.subject}
-                    placeholder="Masukkan perihal surat"
-                  />
-                </div>
+                {!isDeliveryNote && (
+                  <div className="sm:col-span-2">
+                    <Input
+                      label="Perihal"
+                      value={form.subject}
+                      onChange={(e) => setField('subject', e.target.value)}
+                      error={errors.subject}
+                      placeholder="Masukkan perihal surat"
+                    />
+                  </div>
+                )}
               </div>
             </Section>
 

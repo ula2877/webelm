@@ -875,11 +875,17 @@ class SuratController extends Controller
 
         $isDeliveryNote = $jenis === 'delivery-note';
 
+        // Surat Jalan tidak memakai field "Perihal", jadi opsional agar
+        // form tetap bisa disimpan. Jenis surat lain tetap wajib.
+        $subjectRules = $isDeliveryNote
+            ? ['nullable', 'string', 'max:255']
+            : ['required', 'string', 'max:255'];
+
         $validated = $request->validate([
             'nomor' => ['required', 'string', 'max:50'],
             'tanggal' => ['required', 'date'],
             'city' => ['nullable', 'string', 'max:100'],
-            'subject' => ['required', 'string', 'max:255'],
+            'subject' => $subjectRules,
             'customerName' => ['required', 'string', 'max:255'],
             'customerAddress' => ['required', 'string'],
             'nomorPenawaran' => ['nullable', 'string', 'max:100'],
@@ -1018,7 +1024,7 @@ class SuratController extends Controller
 
         $dataJson = [
             'city' => $validated['city'] ?? null,
-            'subject' => $validated['subject'],
+            'subject' => $validated['subject'] ?? '',
             'customerName' => $validated['customerName'],
             'customerAddress' => $validated['customerAddress'],
             'nomorPenawaran' => $validated['nomorPenawaran'] ?? null,

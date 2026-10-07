@@ -178,7 +178,9 @@ export function validateSuratJenis(form, isDeliveryNote = false) {
   const errors = {};
   if (!String(form.nomor || '').trim()) errors.nomor = 'Nomor surat wajib diisi.';
   if (!String(form.tanggal || '').trim()) errors.tanggal = 'Tanggal surat wajib diisi.';
-  if (!String(form.subject || '').trim()) errors.subject = 'Perihal surat wajib diisi.';
+  if (!isDeliveryNote && !String(form.subject || '').trim()) {
+    errors.subject = 'Perihal surat wajib diisi.';
+  }
   if (!String(form.customerName || '').trim()) {
     errors.customerName = 'Nama instansi/perusahaan wajib diisi.';
   }
