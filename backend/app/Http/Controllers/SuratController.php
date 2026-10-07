@@ -54,7 +54,7 @@ class SuratController extends Controller
      */
     private const SURAT_JENIS_PREFIX = [
         'delivery-note' => 'SJ',
-        'bast' => 'BA',
+        'bast' => 'BAST',
         'inspection-request' => 'PP',
         'payment-request' => 'PB',
         'kuitansi' => 'KWT',
@@ -874,6 +874,7 @@ class SuratController extends Controller
         }
 
         $isDeliveryNote = $jenis === 'delivery-note';
+        $isBast = $jenis === 'bast';
 
         // Surat Jalan tidak memakai field "Perihal", jadi opsional agar
         // form tetap bisa disimpan. Jenis surat lain tetap wajib.
@@ -881,23 +882,48 @@ class SuratController extends Controller
             ? ['nullable', 'string', 'max:255']
             : ['required', 'string', 'max:255'];
 
+        // BAST memakai satuan seperti "Unit"/"Set" yang tidak ada di
+        // whitelist surat lain, dan volume boleh kosong.
+        $satuanRules = $isBast
+            ? ['nullable', 'string', 'max:50']
+            : ['required', 'string', 'in:PCS,Paket,OH,LS'];
+        $volumeRules = $isBast
+            ? ['nullable', 'numeric', 'min:0', 'max:999999999999']
+            : ['required', 'numeric', 'gt:0', 'max:999999999999'];
+        $addressRules = $isBast
+            ? ['nullable', 'string']
+            : ['required', 'string'];
+
         $validated = $request->validate([
             'nomor' => ['required', 'string', 'max:50'],
             'tanggal' => ['required', 'date'],
             'city' => ['nullable', 'string', 'max:100'],
             'subject' => $subjectRules,
             'customerName' => ['required', 'string', 'max:255'],
-            'customerAddress' => ['required', 'string'],
+            'customerAddress' => $addressRules,
             'nomorPenawaran' => ['nullable', 'string', 'max:100'],
             'nomorPO' => ['nullable', 'string', 'max:100'],
             'receiverName' => ['nullable', 'string', 'max:255'],
+            // Field khusus BAST. Nullable supaya surat jenis lain
+            // (yang memakai endpoint sama) tidak ikut wajib.
+            'nomorSuratJalan' => ['nullable', 'string', 'max:100'],
+            'nomorSPK' => ['nullable', 'string', 'max:255'],
+            'tanggalSPK' => ['nullable', 'date'],
+            'tanggalPelaksanaan' => ['nullable', 'date'],
+            'pihakPertamaNama' => ['nullable', 'string', 'max:255'],
+            'pihakPertamaAlamat' => ['nullable', 'string'],
+            'pihakKeduaNama' => ['nullable', 'string', 'max:255'],
+            'pihakKeduaAlamat' => ['nullable', 'string'],
+            'pihakPertamaPenandatangan' => ['nullable', 'string', 'max:255'],
+            'signatureSide' => ['nullable', 'in:first,second'],
+            'sumberSuratJalanId' => ['nullable', 'integer'],
             'notes' => ['nullable', 'array'],
             'notes.*' => ['string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.nama_komponen' => ['required', 'string', 'max:500'],
             'items.*.spesifikasi' => ['nullable'],
-            'items.*.volume' => ['required', 'numeric', 'gt:0', 'max:999999999999'],
-            'items.*.satuan' => ['required', 'string', 'in:PCS,Paket,OH,LS'],
+            'items.*.volume' => $volumeRules,
+            'items.*.satuan' => $satuanRules,
             'items.*.harga_satuan' => ['nullable', 'numeric', 'min:0', 'max:999999999999'],
             'useSignature' => ['sometimes', 'boolean'],
             'useStamp' => ['sometimes', 'boolean'],
@@ -913,7 +939,9 @@ class SuratController extends Controller
             'stampPosition.zoom' => ['nullable', 'numeric', 'min:0.1', 'max:3'],
             'signature' => ['nullable', 'array'],
             'signature.companyName' => ['nullable', 'string', 'max:255'],
-            'signature.signerName' => ['required', 'string', 'max:255'],
+            'signature.signerName' => $isBast
+                ? ['nullable', 'string', 'max:255']
+                : ['required', 'string', 'max:255'],
             'signature.signerTitle' => ['nullable', 'string', 'max:100'],
         ], [
             'nomor.required' => 'Nomor surat wajib diisi.',
@@ -975,9 +1003,10 @@ class SuratController extends Controller
         $itemRows = [];
         $total = 0;
         foreach ($validated['items'] as $index => $item) {
-            $volume = (float) $item['volume'];
+            // BAST & Surat Jalan tidak memakai harga -> volume boleh kosong.
+            $volume = isset($item['volume']) ? (float) $item['volume'] : 0;
             $harga = isset($item['harga_satuan']) ? (float) $item['harga_satuan'] : 0;
-            if (!$isDeliveryNote) {
+            if (!$isDeliveryNote && !$isBast) {
                 $total += (int) round($volume * $harga);
             }
 
@@ -996,8 +1025,9 @@ class SuratController extends Controller
                 'nama_komponen' => $item['nama_komponen'],
                 'spesifikasi' => $specs === [] ? null : json_encode($specs),
                 'volume' => $volume,
-                'satuan' => $item['satuan'],
-                'harga_satuan' => $isDeliveryNote ? 0 : (int) round($harga),
+                // BAST & Surat Jalan tidak menyimpan satuan kosong.
+                'satuan' => ($item['satuan'] ?? '') === '' ? null : $item['satuan'],
+                'harga_satuan' => ($isDeliveryNote || $isBast) ? 0 : (int) round($harga),
                 'data' => null,
             ];
         }
@@ -1050,6 +1080,22 @@ class SuratController extends Controller
                 'total' => $total,
             ],
         ];
+
+        // Field khusus BAST disimpan di JSON `data` yang sama. Tidak ada
+        // kolom/migration baru - mengikuti pola field Surat Jalan.
+        if ($isBast) {
+            $dataJson['sumberSuratJalanId'] = $validated['sumberSuratJalanId'] ?? null;
+            $dataJson['nomorSuratJalan'] = $validated['nomorSuratJalan'] ?? null;
+            $dataJson['nomorSPK'] = $validated['nomorSPK'] ?? null;
+            $dataJson['tanggalSPK'] = $validated['tanggalSPK'] ?? null;
+            $dataJson['tanggalPelaksanaan'] = $validated['tanggalPelaksanaan'] ?? null;
+            $dataJson['pihakPertamaNama'] = $validated['pihakPertamaNama'] ?? null;
+            $dataJson['pihakPertamaAlamat'] = $validated['pihakPertamaAlamat'] ?? null;
+            $dataJson['pihakKeduaNama'] = $validated['pihakKeduaNama'] ?? null;
+            $dataJson['pihakKeduaAlamat'] = $validated['pihakKeduaAlamat'] ?? null;
+            $dataJson['pihakPertamaPenandatangan'] = $validated['pihakPertamaPenandatangan'] ?? null;
+            $dataJson['signatureSide'] = $validated['signatureSide'] ?? 'second';
+        }
 
         try {
             $idSurat = DB::transaction(function () use ($existing, $validated, $total, $dataJson, $signatureAssetId, $stampAssetId, $useSignature, $useStamp, $posTtd, $posStempel, $itemRows, $jenis) {

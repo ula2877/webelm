@@ -454,6 +454,123 @@ body {
 }
 
 /* ==========================================================================
+   BAST - Berita Acara Serah Terima
+   Struktur & urutan mengikuti "format berita acara serah terima.docx":
+   judul (center) -> nomor (center) -> paragraf pembuka -> blok pihak
+   (PIHAK PERTAMA / KEDUA) -> tabel pekerjaan -> penutup -> tanda tangan.
+   ========================================================================== */
+
+.bast-title-block {
+  text-align: center;
+  margin-bottom: 2mm;
+}
+.bast-title {
+  font-size: 13pt;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin: 0 0 1.5mm;
+}
+.bast-nomor {
+  font-size: 10pt;
+  margin: 0;
+}
+
+.bast-para {
+  font-size: 10pt;
+  line-height: 1.5;
+  margin: 0 0 2mm;
+  text-align: left;
+}
+/* Paragraf panjang (serah terima + penutup) rata kanan-kiri. */
+.bast-para-justify {
+  text-align: justify;
+}
+
+.bast-pihak {
+  margin-bottom: 2.5mm;
+}
+.bast-pihak-heading {
+  font-size: 10pt;
+  font-weight: 700;
+  margin: 0 0 1mm;
+}
+.bast-pihak-line {
+  font-size: 10pt;
+  line-height: 1.5;
+  margin: 0;
+}
+/* Label "Nama Perusahaan"/"Alamat" lebar tetap agar ":" sejajar. */
+.bast-pihak-label {
+  display: inline-block;
+  width: 30mm;
+}
+
+.bast-table {
+  margin: 2mm 0;
+}
+.bast-spec-label {
+  font-size: 9.5pt;
+  margin: 1.5mm 0 0;
+}
+.bast-spec-list {
+  list-style: decimal;
+  margin: 0.5mm 0 0 5mm;
+  padding: 0;
+  font-size: 9.5pt;
+}
+.bast-spec-list li {
+  margin: 0.2mm 0;
+}
+
+/* Tanda tangan 2 kolom (mengikuti tabel 2 pada dokumen referensi). */
+.bast-signature-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin-top: 8mm;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.bast-signature-table td {
+  width: 50%;
+  vertical-align: top;
+  text-align: center;
+  padding: 0 3mm;
+  border: none;
+}
+.bast-sig-party {
+  font-size: 10pt;
+  font-weight: 700;
+  margin: 0 0 1mm;
+}
+.bast-sig-company {
+  font-size: 10pt;
+  margin: 0 0 1mm;
+}
+.bast-sig-box {
+  height: 20mm;
+  position: relative;
+}
+.bast-sig-box img {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  max-height: 22mm;
+  width: auto;
+  object-fit: contain;
+  transform-origin: center center;
+}
+.bast-sig-name {
+  font-size: 10pt;
+  font-weight: 700;
+  margin: 0;
+}
+.bast-sig-title {
+  font-size: 10pt;
+  margin: 0.3mm 0 0;
+}
+
+/* ==========================================================================
    Invoice-specific: bank table + signature (tidak shared dengan quotation)
    ========================================================================== */
 

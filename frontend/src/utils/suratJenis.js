@@ -39,7 +39,8 @@ export const SURAT_JENIS = {
     routeBase: 'letters/handover',
     searchPlaceholder: 'Cari berita acara...',
     pdfPrefix: 'BAST',
-    nomorPrefix: 'BA',
+    // Prefix mengikuti dokumen referensi: BAST/DDMM[urutan]/ELMECH/YYYY
+    nomorPrefix: 'BAST',
     docTitle: 'BERITA ACARA SERAH TERIMA',
     emptyTitle: 'Tidak ada berita acara',
   },
