@@ -35,7 +35,14 @@ async function toDataUri(url) {
   }
 }
 
-export async function buildPreviewHtml() {
+/**
+ * @param {string} [printCss]
+ *   CSS tambahan yang di-append SETELAH seluruh CSS aplikasi. Dipakai modul
+ *   yang ukuran fisiknya bukan A4 (mis. Kwitansi 230mm x 90mm) untuk
+ *   meng-override `@page { size }` tanpa mengubah modul lain.
+ *   Kosong = perilaku lama persis (A4).
+ */
+export async function buildPreviewHtml(printCss = '') {
   const root = document.getElementById('letter-print-root');
   if (!root) {
     throw new Error('Live preview belum siap.');
@@ -82,10 +89,11 @@ export async function buildPreviewHtml() {
   );
 
   const css = collectAppliedCss();
+  const extra = printCss ? `\n/* --- printCss (modul ini) --- */\n${printCss}\n` : '';
 
   return (
     '<!doctype html><html><head><meta charset="utf-8">' +
-    `<style>${css}</style>` +
+    `<style>${css}${extra}</style>` +
     '</head><body>' +
     html +
     '</body></html>'

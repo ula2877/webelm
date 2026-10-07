@@ -919,6 +919,121 @@ body {
 }
 
 /* ==========================================================================
+   Kwitansi - template cetakan fisik 23 cm x 9 cm
+   Posisi teks memakai CM (bukan px) supaya preview di layar beresolusi
+   berapa pun dan PDF 230mm x 90mm identik. Background = public/kwitansi.jpeg.
+   ========================================================================== */
+
+.kw-root {
+  background: transparent;
+}
+
+.kw-sheet {
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+}
+
+/* Background di-stretch penuh ke 23 x 9 cm.
+   Catatan: rasio gambar 794x346 = 2,295 sedangkan ukuran cetakan 23:9 =
+   2,556, jadi gambar teregang horizontal ~11%. Ini disengaja agar
+   background tetap full-page pada ukuran fisik yang diminta. */
+.kw-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Semua nilai field: tepat di atas garis putus-putus cetakan. */
+.kw-value {
+  position: absolute;
+  margin: 0;
+  font-size: 3.4mm;
+  line-height: 1.25;
+  color: #0b2b45;
+  white-space: nowrap;
+}
+.kw-bold {
+  font-weight: 700;
+}
+.kw-nomor {
+  font-weight: 700;
+  font-size: 3.6mm;
+}
+/* Angka rupiah sedikit lebih besar & tabular agar kolom lurus. */
+.kw-angka {
+  font-size: 4mm;
+  font-variant-numeric: tabular-nums;
+}
+/* Deskripsi "Untuk pembayaran": boleh panjang, turun ke baris berikutnya.
+   line-height 0.85 cm ~= jarak antar garis putus cetakan (4.05/4.9/5.6 cm).
+   max-height = 4 baris; kelebihan dipotong agar tidak menabrak kotak
+   "Jumlah Rp." atau blok penandatangan. */
+.kw-desc {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 8.5mm;
+  text-align: left;
+  max-height: 34mm;
+  overflow: hidden;
+}
+/* Field di sisi kanan (nomor invoice, kota-tanggal). */
+.kw-right {
+  text-align: right;
+}
+
+/* Blok penandatangan di kanan bawah (gaya sama dengan surat lain:
+   nama perusahaan -> tanda tangan/stempel -> nama -> jabatan).
+   Wadahnya absolut; ISINYA blok statis supaya tidak menumpuk. */
+.kw-signer {
+  position: absolute;
+}
+.kw-signer-line {
+  position: static;
+  margin: 0;
+  font-size: 3.2mm;
+  line-height: 1.3;
+  color: #0b2b45;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kw-signer-invoice {
+  font-size: 2.8mm;
+  text-align: right;
+}
+.kw-signer-company {
+  font-weight: 700;
+}
+.kw-sig-box {
+  position: relative;
+  height: 9mm;
+}
+.kw-sig-img {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  max-height: 9mm;
+  max-width: 100%;
+  width: auto;
+  object-fit: contain;
+  /* translateX(-50%) datang dari inline style di komponen. */
+  transform-origin: center center;
+}
+.kw-signer-name {
+  font-weight: 700;
+}
+.kw-signer-title {
+  font-size: 3mm;
+}
+
+/* ==========================================================================
    Print
    ========================================================================== */
 @page {
@@ -989,5 +1104,18 @@ body {
   }
   .letter-table thead {
     display: table-header-group;
+  }
+
+  /* Kwitansi: satu sheet 230mm x 90mm, TIDAK memakai aturan .a4-page. */
+  #letter-print-root.kw-root {
+    width: 230mm !important;
+    height: 90mm !important;
+  }
+  .kw-sheet {
+    width: 230mm !important;
+    height: 90mm !important;
+    box-shadow: none !important;
+    page-break-after: auto !important;
+    break-after: auto !important;
   }
 }

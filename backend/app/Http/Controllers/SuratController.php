@@ -877,17 +877,18 @@ class SuratController extends Controller
         $isBast = $jenis === 'bast';
         $isInspection = $jenis === 'inspection-request';
         $isPaymentRequest = $jenis === 'payment-request';
+        $isKuitansi = $jenis === 'kuitansi';
 
-        // Surat Jalan, BAST, Permohonan Pemeriksaan & Permohonan Pembayaran
-        // tidak punya field "Perihal" yang wajib diisi user, jadi opsional
-        // agar submit tidak ditolak 422. Jenis surat lain tetap wajib.
-        $subjectRules = ($isDeliveryNote || $isBast || $isInspection || $isPaymentRequest)
+        // Surat Jalan, BAST, Permohonan Pemeriksaan, Permohonan Pembayaran &
+        // Kwitansi tidak punya field "Perihal" yang wajib diisi user, jadi
+        // opsional agar submit tidak ditolak 422. Jenis surat lain tetap wajib.
+        $subjectRules = ($isDeliveryNote || $isBast || $isInspection || $isPaymentRequest || $isKuitansi)
             ? ['nullable', 'string', 'max:255']
             : ['required', 'string', 'max:255'];
 
         // Modul tanpa harga: satuan bebas (mis. "Unit"/"Set"), volume boleh
         // kosong, alamat boleh kosong, penandatangan tidak dipaksa terisi.
-        $noHarga = $isBast || $isInspection || $isPaymentRequest;
+        $noHarga = $isBast || $isInspection || $isPaymentRequest || $isKuitansi;
         $satuanRules = $noHarga
             ? ['nullable', 'string', 'max:50']
             : ['required', 'string', 'in:PCS,Paket,OH,LS'];
@@ -921,6 +922,11 @@ class SuratController extends Controller
             'perusahaanAlamat' => ['nullable', 'string'],
             'dokumenPendukung' => ['nullable', 'array'],
             'dokumenPendukung.*' => ['nullable', 'string', 'max:255'],
+            // Field khusus Kwitansi (nominal disimpan di kolom `total`).
+            'nomorInvoice' => ['nullable', 'string', 'max:50'],
+            'tanggalInvoice' => ['nullable', 'date'],
+            'nominal' => ['nullable', 'numeric', 'min:0', 'max:9999999999999999'],
+            'untukPembayaran' => ['nullable', 'string', 'max:1000'],
             'pihakPertamaNama' => ['nullable', 'string', 'max:255'],
             'pihakPertamaAlamat' => ['nullable', 'string'],
             'pihakKeduaNama' => ['nullable', 'string', 'max:255'],
@@ -940,7 +946,8 @@ class SuratController extends Controller
             'tanggalSPK' => ['nullable', 'date'],
             'notes' => ['nullable', 'array'],
             'notes.*' => ['string', 'max:1000'],
-            'items' => ['required', 'array', 'min:1'],
+            // Kwitansi tidak punya item; nominal disimpan di kolom `total`.
+            'items' => $isKuitansi ? ['nullable', 'array'] : ['required', 'array', 'min:1'],
             'items.*.nama_komponen' => ['required', 'string', 'max:500'],
             'items.*.spesifikasi' => ['nullable'],
             'items.*.volume' => $volumeRules,
@@ -1023,7 +1030,12 @@ class SuratController extends Controller
 
         $itemRows = [];
         $total = 0;
-        foreach ($validated['items'] as $index => $item) {
+        // Kwitansi tidak punya daftar item; nominal kwitansi yang menjadi
+        // kolom `total` tb_surat (dipakai juga kolom JUMLAH di list).
+        if ($isKuitansi) {
+            $total = (int) round((float) ($validated['nominal'] ?? 0));
+        }
+        foreach ($validated['items'] ?? [] as $index => $item) {
             // BAST & Permohonan Pemeriksaan tidak memakai harga.
             $volume = isset($item['volume']) ? (float) $item['volume'] : 0;
             $harga = isset($item['harga_satuan']) ? (float) $item['harga_satuan'] : 0;
@@ -1152,6 +1164,17 @@ class SuratController extends Controller
                 array_map('strval', $validated['dokumenPendukung'] ?? []),
                 fn ($d) => trim($d) !== ''
             ));
+        }
+
+        // Field khusus Kwitansi -> JSON `data` yang sama. Nominal disimpan
+        // di kolom `total` (sudah dihitung di atas), bukan kolom baru.
+        if ($isKuitansi) {
+            $dataJson['sumberId'] = $validated['sumberId'] ?? null;
+            $dataJson['sumberJenis'] = $validated['sumberJenis'] ?? 'invoice';
+            $dataJson['nomorInvoice'] = $validated['nomorInvoice'] ?? null;
+            $dataJson['tanggalInvoice'] = $validated['tanggalInvoice'] ?? null;
+            $dataJson['nominal'] = $total;
+            $dataJson['untukPembayaran'] = $validated['untukPembayaran'] ?? null;
         }
 
         try {
@@ -1788,6 +1811,9 @@ class SuratController extends Controller
         // Extract useful fields from JSON for display
         $perihal = $data['subject'] ?? $data['perihal'] ?? '-';
         $pengirim = $data['customerName'] ?? $data['pengirim'] ?? '-';
+        // Kolom NOMOR INVOICE di list Kwitansi. Key ini tidak dibaca modul
+        // lain, jadi aman ditambahkan tanpa mengubah kontrak API yang ada.
+        $nomorInvoice = $data['nomorInvoice'] ?? null;
         $status = $data['status'] ?? ($row->deleted_at ? 'Dihapus' : 'Aktif');
 
         // Map status to badge variant
@@ -1806,6 +1832,7 @@ class SuratController extends Controller
             'tanggal' => $row->tanggal,
             'perihal' => $perihal,
             'pengirim' => $pengirim,
+            'nomorInvoice' => $nomorInvoice,
             'status' => $status,
             'status_variant' => $statusVariant,
             'total' => (int) ($row->total ?? 0),
