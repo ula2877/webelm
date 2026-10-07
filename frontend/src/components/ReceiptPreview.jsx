@@ -38,20 +38,24 @@ export const KW_POSISI = {
   // Angka di bawah dibaca dari kwitansi.jpeg + grid CM (kw-grid.png):
   //   - x_cm = px / 794 * 23,  y_cm = px / 346 * 9
   // Semua nilai ditulis SETELAH teks label tercetak dan TEPAT di garis putus.
-  nomor: at(7.4, 1.42),
-  diterimaDari: at(9.05, 2.16),
-  nominalTerbilang: at(9.6, 2.82),
+  nomor: at(6.6, 1.15),
+  diterimaDari: at(9.85, 2.1),
+  nominalTerbilang: at(9.85, 3.025),
   // "Untuk pembayaran" punya 4 baris putus (y ~4.05 / 4.9 / 5.6 / 6.3 cm).
   // Lebar dibatasi s/d x=14.7cm supaya teks panjang TIDAK masuk zona
   // penandatangan (x 15.15-21.85cm); kelebihan dipotong terkontrol.
-  untukPembayaran: at(9.05, 3.95, { width: '5.65cm' }),
+  untukPembayaran: at(9.85, 3.75, { width: '12.1cm' }),
   // Kotak "Jumlah Rp." bergaris miring mulai x~8.5 cm; angka ditulis di dalamnya.
-  jumlahRp: at(8.75, 6.95),
-  // Blok penandatangan: wadah absolut; ISINYA mengalir statis (company ->
-  // no. invoice -> sig-box -> nama -> jabatan) supaya tidak tumpang tindih.
+  jumlahRp: at(9.0, 6.97),
+  // Blok penandatangan: wadah absolut; ISINYA hanya gambar + NAMA
+  // (tanpa perusahaan & jabatan). Mengalir statis supaya tidak menumpuk.
+  // x dikembalikan ke 15.15 (kanan, sejajar kotaTanggal); 1.15 menaruh
+  // tanda tangan di stub dekoratif kiri.
   penandatangan: at(15.15, 4.3, { width: '6.7cm' }),
+  // Nomor invoice objek tersendiri: kanan, di antara nama & kota/tanggal.
+  nomorInvoice: at(15.35, 5.72, { width: '6.3cm' }),
   // Kota/tanggal di kanan bawah, sejajar kotak Jumlah Rp.
-  kotaTanggal: at(15.35, 6.95, { width: '6.3cm' }),
+  kotaTanggal: at(15.0, 6.2, { width: '6.3cm' }),
 };
 
 export default function ReceiptPreview({ form }) {
@@ -93,15 +97,16 @@ export default function ReceiptPreview({ form }) {
           {form.city || 'Surabaya'}, {formatTanggalKwitansi(form.tanggal)}
         </p>
 
-        {/* Blok penandatangan: anak-anaknya blok statis (bukan absolut)
-            supaya nama & jabatan tidak menumpuk di satu titik. */}
+        {/* Nomor Invoice - objek tersendiri di kanan. */}
+        {form.nomorInvoice ? (
+          <p className="kw-value kw-right kw-signer-invoice" style={KW_POSISI.nomorInvoice}>
+            No. Invoice: {form.nomorInvoice}
+          </p>
+        ) : null}
+
+        {/* Blok penandatangan: hanya gambar + NAMA (tanpa perusahaan &
+            jabatan). Anak-anaknya blok statis supaya tidak menumpuk. */}
         <div className="kw-signer" style={KW_POSISI.penandatangan}>
-          {form.nomorInvoice ? (
-            <p className="kw-signer-line kw-signer-invoice">
-              No. Invoice: {form.nomorInvoice}
-            </p>
-          ) : null}
-          <p className="kw-signer-line kw-signer-company">{form.companyName || '-'}</p>
           <div className="kw-sig-box">
             {form.useStamp && form.stampImage ? (
               <img
@@ -129,7 +134,6 @@ export default function ReceiptPreview({ form }) {
             ) : null}
           </div>
           <p className="kw-signer-line kw-signer-name">{form.signerName || '-'}</p>
-          <p className="kw-signer-line kw-signer-title">{form.signerTitle || '-'}</p>
         </div>
       </div>
     </div>
