@@ -84,16 +84,50 @@ export function buildBastPembuka(tanggal) {
 }
 
 /**
- * Paragraf sumber pekerjaan (pembuka lanjutan):
- * "Nomor SPK/PO : {nomorSPK} Tanggal {tanggalSPK},
- *  Tanggal Pelaksanaan/ Serah Terima : {tanggalPelaksanaan}, antara:"
+ * Paragraf sumber pekerjaan (pembuka lanjutan). Nomor SPK/PO bersifat
+ * opsional, jadi klausanya dibuat/diubah agar kalimat tetap rapi:
+ *   - ada nomor + tanggal -> "Nomor SPK/PO : X Tanggal Y, ..."
+ *   - nomor saja          -> "Nomor SPK/PO : X, ..."
+ *   - tanggal saja        -> "Tanggal SPK/PO : Y, ..."
+ *   - kosong semua        -> klausa SPK/PO dilewati seluruhnya.
  */
 export function buildBastSumber(nomorSPK, tanggalSPK, tanggalPelaksanaan) {
-  return `Nomor SPK/PO : ${nomorSPK || '-'} Tanggal ${formatTanggalPanjangID(
-    tanggalSPK
-  )}, Tanggal Pelaksanaan/ Serah Terima : ${formatTanggalPanjangID(
-    tanggalPelaksanaan
-  )}, antara:`;
+  const nomor = String(nomorSPK || '').trim();
+  const adaTanggalSPK = String(tanggalSPK || '').trim() !== '';
+  const tglSPK = adaTanggalSPK ? formatTanggalPanjangID(tanggalSPK) : '';
+  const tglPelaksanaan = formatTanggalPanjangID(tanggalPelaksanaan);
+
+  const parts = [];
+  if (nomor && adaTanggalSPK) {
+    parts.push(`Nomor SPK/PO : ${nomor} Tanggal ${tglSPK}`);
+  } else if (nomor) {
+    parts.push(`Nomor SPK/PO : ${nomor}`);
+  } else if (adaTanggalSPK) {
+    parts.push(`Tanggal SPK/PO : ${tglSPK}`);
+  }
+  parts.push(`Tanggal Pelaksanaan/ Serah Terima : ${tglPelaksanaan}`);
+
+  return `${parts.join(', ')}, antara:`;
+}
+
+/**
+ * Klausa SPK untuk paragraf serah terima. Nomor SPK/PO opsional, jadi
+ * klausanya dibangkitkan agar tidak pernah menampilkan
+ * "null"/"undefined"/"-" mentah dan kalimat tetap grammatik:
+ *   - nomor + tanggal -> "berdasarkan SPK : X Tanggal Y."
+ *   - nomor saja      -> "berdasarkan SPK : X."
+ *   - tanggal saja    -> "berdasarkan SPK bertanggal Y."
+ *   - kosong semua    -> "" (klausanya dilewati).
+ */
+function buildSpkClause(nomorSPK, tanggalSPK) {
+  const nomor = String(nomorSPK || '').trim();
+  const adaTanggalSPK = String(tanggalSPK || '').trim() !== '';
+  const tglSPK = adaTanggalSPK ? formatTanggalPanjangID(tanggalSPK) : '';
+
+  if (nomor && adaTanggalSPK) return `berdasarkan SPK : ${nomor} Tanggal ${tglSPK}.`;
+  if (nomor) return `berdasarkan SPK : ${nomor}.`;
+  if (adaTanggalSPK) return `berdasarkan SPK bertanggal ${tglSPK}.`;
+  return '';
 }
 
 /** Blok identitas satu pihak (PIHAK PERTAMA / PIHAK KEDUA). */
@@ -114,12 +148,13 @@ export function buildBastPihak(label, namaPerusahaan, alamat) {
  *  dengan pekerjaan yang dipesan berdasarkan SPK : {nomor} Tanggal {tanggal}."
  */
 export function buildBastSerahTerima(nomorSPK, tanggalSPK) {
+  const clause = buildSpkClause(nomorSPK, tanggalSPK);
   return (
     'Dengan ini kedua belah pihak menerangkan bahwa PIHAK KEDUA telah menyerahkan ' +
     'hasil pekerjaan kepada PIHAK PERTAMA, dan PIHAK PERTAMA telah menerima hasil ' +
     'pekerjaan tersebut dalam kondisi baik dan sesuai dengan pekerjaan yang dipesan ' +
-    `berdasarkan SPK : ${nomorSPK || '-'} Tanggal ${formatTanggalPanjangID(tanggalSPK)}.`
-  );
+    clause
+  ).trimEnd() + (clause ? '' : '.');
 }
 
 /** Paragraf penutup (mengikuti referensi, tanpa trailing period tambahan). */
@@ -236,9 +271,6 @@ export function validateBast(form) {
   if (!String(form.nomor || '').trim()) errors.nomor = 'Nomor berita acara wajib diisi.';
   if (!String(form.tanggal || '').trim()) {
     errors.tanggal = 'Tanggal berita acara wajib diisi.';
-  }
-  if (!String(form.nomorSPK || '').trim()) {
-    errors.nomorSPK = 'Nomor SPK/PO wajib diisi.';
   }
   if (!String(form.pihakPertamaNama || '').trim()) {
     errors.pihakPertamaNama = 'Nama perusahaan pihak pertama wajib diisi.';
