@@ -56,7 +56,7 @@ class SuratController extends Controller
         'delivery-note' => 'SJ',
         'bast' => 'BAST',
         'inspection-request' => 'KTR',
-        'payment-request' => 'PB',
+        'payment-request' => 'KTR',
         'kuitansi' => 'KWT',
     ];
 
@@ -876,18 +876,18 @@ class SuratController extends Controller
         $isDeliveryNote = $jenis === 'delivery-note';
         $isBast = $jenis === 'bast';
         $isInspection = $jenis === 'inspection-request';
+        $isPaymentRequest = $jenis === 'payment-request';
 
-        // Surat Jalan, BAST & Permohonan Pemeriksaan tidak punya field
-        // "Perihal" yang bisa diisi user, jadi dibuat opsional agar submit
-        // tidak ditolak 422. Jenis surat lain tetap wajib.
-        $subjectRules = ($isDeliveryNote || $isBast || $isInspection)
+        // Surat Jalan, BAST, Permohonan Pemeriksaan & Permohonan Pembayaran
+        // tidak punya field "Perihal" yang wajib diisi user, jadi opsional
+        // agar submit tidak ditolak 422. Jenis surat lain tetap wajib.
+        $subjectRules = ($isDeliveryNote || $isBast || $isInspection || $isPaymentRequest)
             ? ['nullable', 'string', 'max:255']
             : ['required', 'string', 'max:255'];
 
-        // BAST & Permohonan Pemeriksaan tidak memakai harga: satuan bebas
-        // (mis. "Unit"/"Set"), volume boleh kosong, alamat boleh kosong,
-        // dan penandatangan tidak dipaksa terisi.
-        $noHarga = $isBast || $isInspection;
+        // Modul tanpa harga: satuan bebas (mis. "Unit"/"Set"), volume boleh
+        // kosong, alamat boleh kosong, penandatangan tidak dipaksa terisi.
+        $noHarga = $isBast || $isInspection || $isPaymentRequest;
         $satuanRules = $noHarga
             ? ['nullable', 'string', 'max:50']
             : ['required', 'string', 'in:PCS,Paket,OH,LS'];
@@ -914,6 +914,13 @@ class SuratController extends Controller
             'nomorSPK' => ['nullable', 'string', 'max:255'],
             'tanggalSPK' => ['nullable', 'date'],
             'tanggalPelaksanaan' => ['nullable', 'date'],
+            // Field khusus Surat Permohonan Pembayaran.
+            'nomorBAST' => ['nullable', 'string', 'max:255'],
+            'tanggalBAST' => ['nullable', 'date'],
+            'perusahaanNama' => ['nullable', 'string', 'max:255'],
+            'perusahaanAlamat' => ['nullable', 'string'],
+            'dokumenPendukung' => ['nullable', 'array'],
+            'dokumenPendukung.*' => ['nullable', 'string', 'max:255'],
             'pihakPertamaNama' => ['nullable', 'string', 'max:255'],
             'pihakPertamaAlamat' => ['nullable', 'string'],
             'pihakKeduaNama' => ['nullable', 'string', 'max:255'],
@@ -1123,6 +1130,28 @@ class SuratController extends Controller
             $dataJson['namaPekerjaan'] = $validated['namaPekerjaan'] ?? null;
             $dataJson['nomorSPK'] = $validated['nomorSPK'] ?? null;
             $dataJson['tanggalSPK'] = $validated['tanggalSPK'] ?? null;
+        }
+
+        // Field khusus Permohonan Pembayaran -> JSON `data` yang sama.
+        if ($isPaymentRequest) {
+            $dataJson['sumberId'] = $validated['sumberId'] ?? null;
+            $dataJson['sumberJenis'] = $validated['sumberJenis'] ?? null;
+            $dataJson['lampiran'] = $validated['lampiran'] ?? null;
+            $dataJson['perihal'] = $validated['subject'] ?? '';
+            $dataJson['tujuanJabatan'] = $validated['tujuanJabatan'] ?? null;
+            $dataJson['tujuanInstansi'] = $validated['tujuanInstansi'] ?? null;
+            $dataJson['tujuanAlamat'] = $validated['tujuanAlamat'] ?? null;
+            $dataJson['namaPekerjaan'] = $validated['namaPekerjaan'] ?? null;
+            $dataJson['nomorSPK'] = $validated['nomorSPK'] ?? null;
+            $dataJson['tanggalSPK'] = $validated['tanggalSPK'] ?? null;
+            $dataJson['nomorBAST'] = $validated['nomorBAST'] ?? null;
+            $dataJson['tanggalBAST'] = $validated['tanggalBAST'] ?? null;
+            $dataJson['perusahaanNama'] = $validated['perusahaanNama'] ?? null;
+            $dataJson['perusahaanAlamat'] = $validated['perusahaanAlamat'] ?? null;
+            $dataJson['dokumenPendukung'] = array_values(array_filter(
+                array_map('strval', $validated['dokumenPendukung'] ?? []),
+                fn ($d) => trim($d) !== ''
+            ));
         }
 
         try {

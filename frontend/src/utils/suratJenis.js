@@ -59,7 +59,8 @@ export const SURAT_JENIS = {
     routeBase: 'letters/payment-request',
     searchPlaceholder: 'Cari surat permohonan pembayaran...',
     pdfPrefix: 'Surat-Permohonan-Pembayaran',
-    nomorPrefix: 'PB',
+    // Prefix mengikuti dokumen referensi: KTR/DDMM[urutan]/ELMECH/YYYY
+    nomorPrefix: 'KTR',
     docTitle: 'SURAT PERMOHONAN PEMBAYARAN',
     emptyTitle: 'Tidak ada surat permohonan pembayaran',
   },

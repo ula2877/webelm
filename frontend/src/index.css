@@ -702,6 +702,148 @@ body {
 }
 
 /* ==========================================================================
+   Surat Permohonan Pembayaran
+   Struktur & urutan mengikuti "SURAT PERMOHONAN PEMBAYARAN.docx":
+   judul -> Nomor -> Lampiran/Perihal -> "Yth." + "di Tempat" ->
+   "Dengan hormat," -> dasar (SPK + BAST) -> identitas ->
+   "selaku Penyedia, ..." -> TABEL -> pembayaran -> dokumen pendukung ->
+   penutup -> tanda tangan kanan.
+   ========================================================================== */
+
+.ppb-title-block {
+  text-align: center;
+  margin-bottom: 2mm;
+}
+.ppb-title {
+  font-size: 12pt;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0 0 1.5mm;
+  text-transform: uppercase;
+}
+.ppb-nomor {
+  font-size: 10pt;
+  margin: 0;
+}
+
+/* Baris berlabel: "Lampiran : ..." / "Perihal : ..." */
+.ppb-lines {
+  margin-bottom: 3mm;
+}
+.ppb-label {
+  display: inline-block;
+  width: 20mm;
+}
+/* Label identitas perlu ruang lebih ("Nama Perusahaan"). */
+.ppb-label-wide {
+  width: 32mm;
+}
+
+.ppb-tujuan {
+  margin-bottom: 3mm;
+}
+
+.ppb-para {
+  font-size: 10pt;
+  line-height: 1.5;
+  margin: 0 0 2mm;
+  text-align: left;
+}
+/* Paragraf panjang rata kanan-kiri, mengikuti dokumen referensi (jc=both). */
+.ppb-para-justify {
+  text-align: justify;
+}
+.ppb-line {
+  font-size: 10pt;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Identitas penyedia: dua baris berlabel, tanpa jarak antar baris. */
+.ppb-identitas {
+  margin-bottom: 2mm;
+}
+
+.ppb-table {
+  margin: 2mm 0;
+}
+.ppb-spec-label {
+  font-size: 9.5pt;
+  margin: 1.5mm 0 0;
+}
+.ppb-spec-list {
+  list-style: decimal;
+  margin: 0.5mm 0 0 5mm;
+  padding: 0;
+  font-size: 9.5pt;
+}
+.ppb-spec-list li {
+  margin: 0.2mm 0;
+}
+
+/* Daftar dokumen pendukung (numId=14 di dokumen referensi). */
+.ppb-dokumen-list {
+  list-style: decimal;
+  margin: 0 0 2mm 6mm;
+  padding: 0;
+  font-size: 10pt;
+  line-height: 1.5;
+}
+.ppb-dokumen-list li {
+  margin: 0.2mm 0;
+}
+
+/* Tanda tangan hanya kolom kanan. */
+.ppb-signature-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin-top: 8mm;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.ppb-signature-table td {
+  width: 50%;
+  vertical-align: top;
+  text-align: left;
+  padding: 0;
+  border: none;
+}
+.ppb-sig-city {
+  font-size: 10pt;
+  margin: 0;
+}
+.ppb-sig-hormat {
+  font-size: 10pt;
+  margin: 4mm 0 0;
+}
+.ppb-sig-company {
+  font-size: 10pt;
+  margin: 1mm 0 0;
+}
+.ppb-sig-box {
+  height: 20mm;
+  position: relative;
+}
+.ppb-sig-box img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-height: 22mm;
+  width: auto;
+  object-fit: contain;
+  transform-origin: center center;
+}
+.ppb-sig-name {
+  font-size: 10pt;
+  margin: 0;
+}
+.ppb-sig-title {
+  font-size: 10pt;
+  margin: 0.3mm 0 0;
+}
+
+/* ==========================================================================
    Invoice-specific: bank table + signature (tidak shared dengan quotation)
    ========================================================================== */
 
