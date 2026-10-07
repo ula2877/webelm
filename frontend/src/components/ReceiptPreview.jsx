@@ -53,9 +53,9 @@ export const KW_POSISI = {
   // tanda tangan di stub dekoratif kiri.
   penandatangan: at(15.85, 6.5, { width: '6.7cm' }),
   // Nomor invoice objek tersendiri: kanan, di antara nama & kota/tanggal.
-  nomorInvoice: at(4.35, 5.25, { width: '6.3cm' }),
+  nomorInvoice: at(5.35, 5.25, { width: '6.3cm' }),
   // Kota/tanggal di kanan bawah, sejajar kotak Jumlah Rp.
-  kotaTanggal: at(15.0, 6.2, { width: '6.3cm' }),
+  kotaTanggal: at(15.0, 6.1, { width: '6.3cm' }),
 };
 
 export default function ReceiptPreview({ form }) {

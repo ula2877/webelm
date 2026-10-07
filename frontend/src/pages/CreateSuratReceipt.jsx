@@ -8,7 +8,6 @@ import ReceiptPreview from '../components/ReceiptPreview';
 import { buildPreviewHtml } from '../utils/quotationPrintHtml';
 import { cn } from '../utils/helpers';
 import * as suratService from '../services/surat';
-import { validateImageFile } from '../utils/suratJenis';
 import {
   KW_PRINT_CSS,
   buildReceiptPayload,
@@ -19,7 +18,7 @@ import {
   terisiBilaKosong,
   validateReceipt,
 } from '../utils/receipt';
-import { ImageAssetField, Section, Toggle, ZoomControls } from './CreateSuratQuotation';
+import { Section, ZoomControls } from './CreateSuratQuotation';
 
 const ZOOM_LEVELS = [50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200];
 const ZOOM_MIN = ZOOM_LEVELS[0];
@@ -50,7 +49,6 @@ export default function CreateSuratReceipt() {
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [assetIds, setAssetIds] = useState({ signature: null, stamp: null });
 
   // ---- Live preview zoom (fit-to-width by default) ----
   const previewViewportRef = useRef(null);
@@ -167,8 +165,7 @@ export default function CreateSuratReceipt() {
           setLoadError('Kwitansi tidak ditemukan.');
           return;
         }
-        const { assetIds: ids, form: loaded } = formFromReceiptDetail(res.data);
-        setAssetIds(ids);
+        const { form: loaded } = formFromReceiptDetail(res.data);
         setForm(loaded);
       })
       .catch((err) => {
@@ -239,81 +236,6 @@ export default function CreateSuratReceipt() {
     }
   };
 
-  // ------------------------------------------------- signature / stamp assets
-  const [imageErrors, setImageErrors] = useState({});
-  const [assets, setAssets] = useState({ signature: [], stamp: [] });
-  const [assetsLoading, setAssetsLoading] = useState({ signature: false, stamp: false });
-  const [uploading, setUploading] = useState({ signature: false, stamp: false });
-
-  const loadAssets = useCallback(
-    async (jenis) => {
-      setAssetsLoading((prev) => ({ ...prev, [jenis]: true }));
-      try {
-        const res = await suratService.fetchSuratAssets(jenis);
-        if (res.status === 'ok') {
-          setAssets((prev) => ({ ...prev, [jenis]: res.data || [] }));
-        }
-      } catch (err) {
-        showNotice('error', err.message || 'Gagal memuat asset sebelumnya.');
-      } finally {
-        setAssetsLoading((prev) => ({ ...prev, [jenis]: false }));
-      }
-    },
-    [showNotice]
-  );
-
-  useEffect(() => {
-    loadAssets('signature');
-    loadAssets('stamp');
-  }, [loadAssets]);
-
-  const handleUploadAsset = useCallback(
-    async (jenis, field, errorKey, file) => {
-      const err = validateImageFile(file);
-      if (err) {
-        setImageErrors((prev) => ({ ...prev, [errorKey]: err }));
-        return;
-      }
-      setImageErrors((prev) => ({ ...prev, [errorKey]: null }));
-      setUploading((prev) => ({ ...prev, [jenis]: true }));
-      try {
-        const res = await suratService.uploadSuratAsset(jenis, file);
-        if (res.status === 'ok' && res.data?.url) {
-          setForm((prev) => ({ ...prev, [field]: res.data.url }));
-          setAssetIds((prev) => ({ ...prev, [jenis]: res.data.id ?? null }));
-          loadAssets(jenis);
-        } else {
-          setImageErrors((prev) => ({ ...prev, [errorKey]: 'Gagal mengunggah file.' }));
-        }
-      } catch (uploadErr) {
-        setImageErrors((prev) => ({
-          ...prev,
-          [errorKey]: uploadErr.message || 'Gagal mengunggah file.',
-        }));
-      } finally {
-        setUploading((prev) => ({ ...prev, [jenis]: false }));
-      }
-    },
-    [loadAssets]
-  );
-
-  const handleSelectAsset = useCallback((field, url, assetId) => {
-    setForm((prev) => ({ ...prev, [field]: url }));
-    setAssetIds((prev) => ({
-      ...prev,
-      [field === 'signatureImage' ? 'signature' : 'stamp']: assetId ?? null,
-    }));
-  }, []);
-
-  // "Hapus" hanya melepas dari form; record tb_surat_asset tidak dihapus.
-  const handleImageRemove = useCallback((field) => {
-    setForm((prev) => ({ ...prev, [field]: null }));
-    setAssetIds((prev) => ({
-      ...prev,
-      [field === 'signatureImage' ? 'signature' : 'stamp']: null,
-    }));
-  }, []);
-
   // ---------------------------------------------------------------- actions
   const validateForm = () => {
     const { valid, errors: validationErrors } = validateReceipt(form);
@@ -329,7 +251,7 @@ export default function CreateSuratReceipt() {
     if (isSubmitting || !validateForm()) return;
     setIsSubmitting(true);
     try {
-      const payload = buildReceiptPayload(form, assetIds);
+      const payload = buildReceiptPayload(form);
       const res = isEditMode
         ? await suratService.updateSuratJenis(editId, CFG.jenis, payload)
         : await suratService.saveSuratJenis(CFG.jenis, payload);
@@ -575,79 +497,6 @@ export default function CreateSuratReceipt() {
                   onChange={(e) => setField('signerTitle', e.target.value)}
                   placeholder="Direktur"
                 />
-
-                {/* Tanda tangan */}
-                <div className="sm:col-span-2 border-t border-border pt-4">
-                  <Toggle
-                    checked={form.useSignature}
-                    onChange={(v) => setField('useSignature', v)}
-                    label="Gunakan Tanda Tangan"
-                    description="Tampilkan gambar tanda tangan pada kwitansi."
-                  />
-                  {form.useSignature && (
-                    <div className="mt-3">
-                      <ImageAssetField
-                        label="Tanda tangan"
-                        kind="signature"
-                        image={form.signatureImage}
-                        x={form.signatureX}
-                        y={form.signatureY}
-                        zoom={form.signatureZoom}
-                        error={imageErrors.signature}
-                        assets={assets.signature}
-                        assetsLoading={assetsLoading.signature}
-                        uploading={uploading.signature}
-                        onUploadFile={(file) =>
-                          handleUploadAsset('signature', 'signatureImage', 'signature', file)
-                        }
-                        onSelectAsset={(asset) =>
-                          handleSelectAsset('signatureImage', asset.url, asset.id)
-                        }
-                        onChange={(key, value) =>
-                          setField(
-                            { x: 'signatureX', y: 'signatureY', zoom: 'signatureZoom' }[key],
-                            value
-                          )
-                        }
-                        onRemove={() => handleImageRemove('signatureImage')}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Stempel */}
-                <div className="sm:col-span-2 border-t border-border pt-4">
-                  <Toggle
-                    checked={form.useStamp}
-                    onChange={(v) => setField('useStamp', v)}
-                    label="Gunakan Stempel"
-                    description="Tampilkan gambar stempel pada kwitansi."
-                  />
-                  {form.useStamp && (
-                    <div className="mt-3">
-                      <ImageAssetField
-                        label="Stempel"
-                        kind="stamp"
-                        image={form.stampImage}
-                        x={form.stampX}
-                        y={form.stampY}
-                        zoom={form.stampZoom}
-                        error={imageErrors.stamp}
-                        assets={assets.stamp}
-                        assetsLoading={assetsLoading.stamp}
-                        uploading={uploading.stamp}
-                        onUploadFile={(file) =>
-                          handleUploadAsset('stamp', 'stampImage', 'stamp', file)
-                        }
-                        onSelectAsset={(asset) => handleSelectAsset('stampImage', asset.url, asset.id)}
-                        onChange={(key, value) =>
-                          setField({ x: 'stampX', y: 'stampY', zoom: 'stampZoom' }[key], value)
-                        }
-                        onRemove={() => handleImageRemove('stampImage')}
-                      />
-                    </div>
-                  )}
-                </div>
               </div>
             </Section>
           </div>
