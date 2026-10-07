@@ -971,15 +971,15 @@ body {
   font-variant-numeric: tabular-nums;
 }
 /* Deskripsi "Untuk pembayaran": boleh panjang, turun ke baris berikutnya.
-   Spasi antar baris dibuat rapat (6mm).
+   Spasi antar baris dibuat rapat (6.75mm).
    max-height = 4 baris; kelebihan dipotong agar tidak menabrak kotak
    "Jumlah Rp." atau blok penandatangan. */
 .kw-desc {
   white-space: normal;
   word-break: break-word;
-  line-height: 6mm;
+  line-height: 6.75mm;
   text-align: left;
-  max-height: 24mm;
+  max-height: 27mm;
   overflow: hidden;
 }
 /* Field di sisi kanan (nomor invoice, kota-tanggal). */
@@ -1005,7 +1005,7 @@ body {
   text-overflow: ellipsis;
 }
 .kw-signer-invoice {
-  font-size: 2.8mm;
+  /* Ukuran font sama dengan field lain (3.4mm dari .kw-value). */
   text-align: right;
 }
 .kw-signer-company {
