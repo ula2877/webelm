@@ -873,6 +873,8 @@ class SuratController extends Controller
             ]);
         }
 
+        $isDeliveryNote = $jenis === 'delivery-note';
+
         $validated = $request->validate([
             'nomor' => ['required', 'string', 'max:50'],
             'tanggal' => ['required', 'date'],
@@ -880,6 +882,9 @@ class SuratController extends Controller
             'subject' => ['required', 'string', 'max:255'],
             'customerName' => ['required', 'string', 'max:255'],
             'customerAddress' => ['required', 'string'],
+            'nomorPenawaran' => ['nullable', 'string', 'max:100'],
+            'nomorPO' => ['nullable', 'string', 'max:100'],
+            'receiverName' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'array'],
             'notes.*' => ['string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
@@ -887,7 +892,7 @@ class SuratController extends Controller
             'items.*.spesifikasi' => ['nullable'],
             'items.*.volume' => ['required', 'numeric', 'gt:0', 'max:999999999999'],
             'items.*.satuan' => ['required', 'string', 'in:PCS,Paket,OH,LS'],
-            'items.*.harga_satuan' => ['required', 'numeric', 'min:0', 'max:999999999999'],
+            'items.*.harga_satuan' => ['nullable', 'numeric', 'min:0', 'max:999999999999'],
             'useSignature' => ['sometimes', 'boolean'],
             'signature_asset_id' => ['nullable', 'integer'],
             'signaturePosition' => ['nullable', 'array'],
@@ -944,8 +949,10 @@ class SuratController extends Controller
         $total = 0;
         foreach ($validated['items'] as $index => $item) {
             $volume = (float) $item['volume'];
-            $harga = (float) $item['harga_satuan'];
-            $total += (int) round($volume * $harga);
+            $harga = isset($item['harga_satuan']) ? (float) $item['harga_satuan'] : 0;
+            if (!$isDeliveryNote) {
+                $total += (int) round($volume * $harga);
+            }
 
             $specs = $item['spesifikasi'] ?? null;
             if (is_string($specs)) {
@@ -963,7 +970,7 @@ class SuratController extends Controller
                 'spesifikasi' => $specs === [] ? null : json_encode($specs),
                 'volume' => $volume,
                 'satuan' => $item['satuan'],
-                'harga_satuan' => (int) round($harga),
+                'harga_satuan' => $isDeliveryNote ? 0 : (int) round($harga),
                 'data' => null,
             ];
         }
@@ -988,6 +995,9 @@ class SuratController extends Controller
             'subject' => $validated['subject'],
             'customerName' => $validated['customerName'],
             'customerAddress' => $validated['customerAddress'],
+            'nomorPenawaran' => $validated['nomorPenawaran'] ?? null,
+            'nomorPO' => $validated['nomorPO'] ?? null,
+            'receiverName' => $validated['receiverName'] ?? null,
             'useSignature' => $useSignature,
             'useSignatureStamp' => $useSignature,
             'signatureImage' => $signatureAsset ? $signatureAsset->path : null,

@@ -4,6 +4,7 @@ import { ArrowLeft, FileDown, Loader2, Edit2 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import SuratJenisPreview from '../components/SuratJenisPreview';
+import SuratJalanPreview from '../components/SuratJalanPreview';
 import { buildPreviewHtml } from '../utils/quotationPrintHtml';
 import * as suratService from '../services/surat';
 import { formFromSuratJenisDetail, suratJenisConfig } from '../utils/suratJenis';
@@ -128,7 +129,11 @@ export default function ViewSuratJenis({ jenisKey }) {
         <Card className="!p-0 overflow-hidden">
           <div className="p-3 sm:p-4 bg-gray-100 max-h-[78vh] overflow-auto">
             <div className="w-fit mx-auto">
-              <SuratJenisPreview form={form} title={cfg.docTitle} />
+              {jenisKey === 'delivery-note' ? (
+                <SuratJalanPreview form={form} />
+              ) : (
+                <SuratJenisPreview form={form} title={cfg.docTitle} />
+              )}
             </div>
           </div>
         </Card>

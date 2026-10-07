@@ -106,6 +106,9 @@ export function createInitialSuratJenisForm() {
     subject: '',
     customerName: '',
     customerAddress: '',
+    nomorPenawaran: '',
+    nomorPO: '',
+    receiverName: '',
     items: [emptyItem()],
     notes: [''],
     useSignature: false,
@@ -143,6 +146,9 @@ export function buildSuratJenisPayload(form, assetIds = {}) {
     subject: form.subject || '',
     customerName: form.customerName || '',
     customerAddress: form.customerAddress || '',
+    nomorPenawaran: form.nomorPenawaran || '',
+    nomorPO: form.nomorPO || '',
+    receiverName: form.receiverName || '',
     useSignature: !!form.useSignature,
     signature_asset_id: assetIds.signature || null,
     signaturePosition: form.useSignature
@@ -158,7 +164,7 @@ export function buildSuratJenisPayload(form, assetIds = {}) {
   };
 }
 
-export function validateSuratJenis(form) {
+export function validateSuratJenis(form, isDeliveryNote = false) {
   const errors = {};
   if (!String(form.nomor || '').trim()) errors.nomor = 'Nomor surat wajib diisi.';
   if (!String(form.tanggal || '').trim()) errors.tanggal = 'Tanggal surat wajib diisi.';
@@ -182,7 +188,7 @@ export function validateSuratJenis(form) {
       if (!String(item.nama_komponen || '').trim()) e.nama_komponen = 'Nama komponen wajib diisi.';
       if (!(Number(item.volume) > 0)) e.volume = 'Volume harus lebih dari 0.';
       if (!String(item.satuan || '').trim()) e.satuan = 'Satuan wajib dipilih.';
-      if (!(Number(item.harga_satuan) > 0)) e.harga_satuan = 'Harga satuan harus lebih dari 0.';
+      if (!isDeliveryNote && !(Number(item.harga_satuan) > 0)) e.harga_satuan = 'Harga satuan harus lebih dari 0.';
       return e;
     });
     if (itemErrors.some((e) => Object.keys(e).length > 0)) {
@@ -213,6 +219,9 @@ export function formFromSuratJenisDetail(detail) {
     subject: d.subject ?? '',
     customerName: d.customerName ?? '',
     customerAddress: d.customerAddress ?? '',
+    nomorPenawaran: d.nomorPenawaran ?? '',
+    nomorPO: d.nomorPO ?? '',
+    receiverName: d.receiverName ?? '',
     items:
       Array.isArray(detail.items) && detail.items.length
         ? detail.items.map((it) => ({

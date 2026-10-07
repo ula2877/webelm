@@ -365,6 +365,95 @@ body {
 }
 
 /* ==========================================================================
+   Surat Jalan specific: info 2 kolom + signature 2 kolom
+   ========================================================================== */
+
+/* Info section: kiri (penerima) + kanan (meta) */
+.sj-info-section {
+  display: flex;
+  gap: 10mm;
+  align-items: flex-start;
+  margin-bottom: 4mm;
+}
+.sj-info-recipient {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.sj-info-recipient p {
+  margin: 0.3mm 0;
+}
+.sj-info-recipient .recipient-name {
+  font-weight: 700;
+  margin-bottom: 0.5mm;
+}
+.sj-info-recipient .recipient-address {
+  white-space: pre-line;
+}
+.sj-info-meta {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.sj-info-meta-table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+}
+.sj-info-meta-table td {
+  vertical-align: top;
+  padding: 0.3mm 0;
+  word-break: break-word;
+}
+.sj-info-meta-table td:nth-child(2) {
+  padding-right: 1.5mm;
+  white-space: nowrap;
+}
+
+/* Signature section: kiri (Diterima Oleh) + kanan (Hormat Kami) */
+.sj-signature-section {
+  display: flex;
+  gap: 10mm;
+  align-items: flex-start;
+  margin-top: 8mm;
+}
+.sj-signature-left {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+}
+.sj-signature-right {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+}
+.sj-signature-box {
+  height: 18mm;
+  position: relative;
+  margin: 0 auto;
+  max-width: 60mm;
+}
+.sj-signature-box img {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  max-height: 22mm;
+  width: auto;
+  object-fit: contain;
+  transform-origin: center center;
+}
+.sj-signature-name {
+  font-weight: 700;
+  text-decoration: underline;
+  margin-top: 1mm;
+}
+.sj-signature-title {
+  margin-top: 0.3mm;
+}
+.sj-company-name {
+  font-weight: 700;
+  margin-bottom: 0.5mm;
+}
+
+/* ==========================================================================
    Invoice-specific: bank table + signature (tidak shared dengan quotation)
    ========================================================================== */
 

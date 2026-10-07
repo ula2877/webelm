@@ -5,6 +5,7 @@ import Pagination from '../components/ui/Pagination';
 import EmptyState from '../components/ui/EmptyState';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import SuratJenisPreview from '../components/SuratJenisPreview';
+import SuratJalanPreview from '../components/SuratJalanPreview';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as suratService from '../services/surat';
@@ -329,7 +330,11 @@ export default function SuratJenisPage({ jenisKey, jenisLabel, createLabel }) {
       {/* Offscreen preview untuk generate PDF langsung dari list */}
       {pdfForm && (
         <div style={{ position: 'absolute', left: -10000, top: 0 }} aria-hidden="true">
-          <SuratJenisPreview form={pdfForm.form} title={cfg.docTitle} />
+          {jenisKey === 'delivery-note' ? (
+            <SuratJalanPreview form={pdfForm.form} />
+          ) : (
+            <SuratJenisPreview form={pdfForm.form} title={cfg.docTitle} />
+          )}
         </div>
       )}
 

@@ -28,6 +28,7 @@ import {
   validateImageFile,
   validateSuratJenis,
 } from '../utils/suratJenis';
+import SuratJalanPreview from '../components/SuratJalanPreview';
 import {
   ImageAssetField,
   Section,
@@ -54,7 +55,7 @@ export default function CreateSuratJenis({ jenisKey }) {
   const cfg = suratJenisConfig(jenisKey);
   const [isLoadingDetail, setIsLoadingDetail] = useState(isEditMode);
   const [loadError, setLoadError] = useState(null);
-  const [form, setForm] = useState(createInitialSuratJenisForm);
+  const [form, setForm] = useState({ ...createInitialSuratJenisForm(), sumberQuotationId: null });
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,6 +65,61 @@ export default function CreateSuratJenis({ jenisKey }) {
   // null = tidak pakai / belum dipilih. Hanya ID-nya
   // yang dikirim ke backend (id_asset_ttd).
   const [assetIds, setAssetIds] = useState({ signature: null });
+
+  // ---- Surat Jalan: daftar Surat Penawaran untuk "Ambil dari Surat Penawaran" ----
+  const isDeliveryNote = jenisKey === 'delivery-note';
+  const [quotations, setQuotations] = useState([]);
+  const [quotationsLoading, setQuotationsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isDeliveryNote) return undefined;
+    let cancelled = false;
+    setQuotationsLoading(true);
+    suratService
+      .fetchSurat({ search: '', jenis: 'quotation', page: 1, perPage: 100 })
+      .then((res) => {
+        if (!cancelled && res?.status === 'ok') {
+          setQuotations(res.data || []);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setQuotationsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isDeliveryNote]);
+
+  const handleSourceQuotationChange = async (id) => {
+    setField('sumberQuotationId', id ? Number(id) : null);
+    if (!id) return;
+    try {
+      const res = await suratService.fetchQuotationDetail(id);
+      if (res?.status === 'ok' && res.data) {
+        const d = res.data.data || {};
+        setForm((prev) => ({
+          ...prev,
+          sumberQuotationId: Number(id),
+          nomorPenawaran: res.data.nomor || '',
+          customerName: d.customerName || '',
+          customerAddress: d.customerAddress || '',
+          items: Array.isArray(res.data.items) && res.data.items.length
+            ? res.data.items.map((it) => ({
+                id: `item-${Math.random().toString(36).slice(2, 9)}`,
+                nama_komponen: it.nama_komponen ?? '',
+                spesifikasi: Array.isArray(it.spesifikasi) ? it.spesifikasi.join('\n') : '',
+                volume: it.volume ?? '',
+                satuan: it.satuan ?? '',
+                harga_satuan: it.harga_satuan ?? '',
+              }))
+            : prev.items,
+        }));
+      }
+    } catch (err) {
+      showNotice('error', err.message || 'Gagal memuat data Surat Penawaran.');
+    }
+  };
 
   // ---- Live preview zoom (fit-to-width by default) ----
   const previewViewportRef = useRef(null);
@@ -317,7 +373,7 @@ export default function CreateSuratJenis({ jenisKey }) {
   // ---------------------------------------------------------------- actions
   // Validasi dulu (frontend), lalu backend memvalidasi ulang.
   const validateForm = () => {
-    const { valid, errors: validationErrors } = validateSuratJenis(form);
+    const { valid, errors: validationErrors } = validateSuratJenis(form, isDeliveryNote);
     setErrors(validationErrors);
     if (!valid) {
       showNotice('error', 'Lengkapi field wajib sebelum menyimpan surat.');
@@ -443,6 +499,47 @@ export default function CreateSuratJenis({ jenisKey }) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           {/* ---------------------------------------------------------- FORM */}
           <div className="lg:col-span-1 min-w-0 space-y-6">
+            {/* 0. Informasi Sumber (khusus Surat Jalan) */}
+            {isDeliveryNote && (
+              <Section title="Informasi Sumber Surat Jalan">
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">
+                      Ambil dari Surat Penawaran
+                    </label>
+                    <select
+                      value={form.sumberQuotationId || ''}
+                      onChange={(e) => handleSourceQuotationChange(e.target.value)}
+                      className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    >
+                      <option value="">-- Pilih Surat Penawaran --</option>
+                      {quotationsLoading ? (
+                        <option disabled>Memuat...</option>
+                      ) : (
+                        quotations.map((q) => (
+                          <option key={q.id} value={q.id}>
+                            {q.nomor} — {q.pengirim || '-'}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                  <Input
+                    label="Nomor Penawaran"
+                    value={form.nomorPenawaran}
+                    onChange={(e) => setField('nomorPenawaran', e.target.value)}
+                    placeholder="Nomor surat penawaran (otomatis jika dipilih)"
+                  />
+                  <Input
+                    label="Nomor PO/SPK"
+                    value={form.nomorPO}
+                    onChange={(e) => setField('nomorPO', e.target.value)}
+                    placeholder="Masukkan nomor PO/SPK"
+                  />
+                </div>
+              </Section>
+            )}
+
             {/* 1. Informasi Surat */}
             <Section title="Informasi Surat">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -497,13 +594,21 @@ export default function CreateSuratJenis({ jenisKey }) {
                   error={errors.customerAddress}
                   placeholder="Masukkan alamat instansi / perusahaan"
                 />
+                {isDeliveryNote && (
+                  <Input
+                    label="Diterima Oleh (Nama Penerima)"
+                    value={form.receiverName}
+                    onChange={(e) => setField('receiverName', e.target.value)}
+                    placeholder="Masukkan nama penerima barang"
+                  />
+                )}
               </div>
             </Section>
 
             {/* 3. Komponen / Item */}
             <Section
               title="Komponen / Item"
-              subtitle="Tambahkan satu atau lebih komponen beserta harga satuan."
+              subtitle={isDeliveryNote ? "Tambahkan satu atau lebih komponen." : "Tambahkan satu atau lebih komponen beserta harga satuan."}
             >
               {errors.items && <p className="mb-3 text-sm text-error">{errors.items}</p>}
               <div className="space-y-4">
@@ -587,24 +692,28 @@ export default function CreateSuratJenis({ jenisKey }) {
                             </option>
                           ))}
                         </Select>
-                        <Input
-                          label="Harga Satuan (Rp)"
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={item.harga_satuan}
-                          onChange={(e) => updateItem(index, 'harga_satuan', e.target.value)}
-                          error={itemError.harga_satuan}
-                          placeholder="Masukkan harga satuan"
-                        />
-                        <div className="w-full">
-                          <label className="block text-sm font-medium text-text-primary mb-1.5">
-                            Subtotal
-                          </label>
-                          <div className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm font-medium text-text-primary">
-                            {rupiah(computeItemSubtotal(item))}
-                          </div>
-                        </div>
+                        {!isDeliveryNote && (
+                          <>
+                            <Input
+                              label="Harga Satuan (Rp)"
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={item.harga_satuan}
+                              onChange={(e) => updateItem(index, 'harga_satuan', e.target.value)}
+                              error={itemError.harga_satuan}
+                              placeholder="Masukkan harga satuan"
+                            />
+                            <div className="w-full">
+                              <label className="block text-sm font-medium text-text-primary mb-1.5">
+                                Subtotal
+                              </label>
+                              <div className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm font-medium text-text-primary">
+                                {rupiah(computeItemSubtotal(item))}
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   );
@@ -618,15 +727,17 @@ export default function CreateSuratJenis({ jenisKey }) {
               </div>
             </Section>
 
-            {/* 4. Perhitungan Harga */}
-            <Section title="Perhitungan Harga">
-              <div className="rounded-lg border border-border bg-gray-50/60 p-4 space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-text-secondary">Total</span>
-                  <span className="font-medium text-text-primary">{rupiah(totals.total)}</span>
+            {/* 4. Perhitungan Harga (tidak untuk Surat Jalan) */}
+            {!isDeliveryNote && (
+              <Section title="Perhitungan Harga">
+                <div className="rounded-lg border border-border bg-gray-50/60 p-4 space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-text-secondary">Total</span>
+                    <span className="font-medium text-text-primary">{rupiah(totals.total)}</span>
+                  </div>
                 </div>
-              </div>
-            </Section>
+              </Section>
+            )}
 
             {/* 5. Keterangan */}
             <Section title="Keterangan">
@@ -738,7 +849,11 @@ export default function CreateSuratJenis({ jenisKey }) {
                 className="p-3 sm:p-4 bg-gray-100 max-h-[78vh] overflow-auto"
               >
                 <div className="letter-zoom w-fit mx-auto" style={{ zoom: scale }}>
-                  <SuratJenisPreview form={form} title={cfg.docTitle} />
+                  {isDeliveryNote ? (
+                    <SuratJalanPreview form={form} />
+                  ) : (
+                    <SuratJenisPreview form={form} title={cfg.docTitle} />
+                  )}
                 </div>
               </div>
             </Card>
