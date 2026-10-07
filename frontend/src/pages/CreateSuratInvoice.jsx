@@ -496,7 +496,7 @@ export default function CreateSuratInvoice() {
         <div className="flex items-start gap-3">
           <button
             type="button"
-            onClick={() => navigate('/letters/quotation')}
+            onClick={() => navigate('/letters/invoice')}
             className="mt-0.5 p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-gray-100 transition-colors"
             title="Kembali"
           >
