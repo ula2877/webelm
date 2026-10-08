@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FileText, Plus, Search, RotateCcw, Eye, Pencil, Trash2 } from 'lucide-react';
+import { FileText, Plus, Search, RotateCcw, Eye, Pencil, Trash2, Loader2 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -8,7 +8,14 @@ import Pagination from '../components/ui/Pagination';
 import EmptyState from '../components/ui/EmptyState';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import Modal from '../components/ui/Modal';
-import { deleteProject, listProjects, PROJECT_STATUS_VARIANT } from '../utils/projects';
+import * as projectService from '../services/projects';
+import { rupiah } from '../utils/suratJenis';
+import {
+  PROJECT_JENIS,
+  PROJECT_STATUS_VARIANT,
+  PROJECT_URGENCY,
+  projectStatusLabel,
+} from '../utils/projects';
 
 const ITEMS_PER_PAGE = 6;
 const CFG = {
@@ -16,17 +23,20 @@ const CFG = {
   label: 'Projek',
 };
 
-// Halaman list Projek (mock frontend sementara).
+// Halaman list Projek (data dari GET /api/projects).
 // Pola UI/behavior mengikuti halaman Surat: search debounce (500ms) +
 // Reset Filter, tabel KODE|NAMA|CUSTOMER|TANGGAL|STATUS|AKSI, aksi icon
-// View (modal detail) / Edit / Delete (confirm dialog), pagination.
+// View (modal detail) / Edit / Delete (confirm dialog), pagination server.
 export default function Projek() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [projects, setProjects] = useState(() => listProjects());
+  const [projects, setProjects] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
   const [notice, setNotice] = useState(location.state?.notice || null);
   const [viewItem, setViewItem] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, item: null });
@@ -34,49 +44,55 @@ export default function Projek() {
 
   const searchInputRef = useRef(null);
   const noticeTimerRef = useRef(null);
+  const showNoticeRef = useRef(null);
+  showNoticeRef.current = (type, message) => {
+    setNotice({ type, message });
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = setTimeout(() => setNotice(null), 5000);
+  };
 
   // Hapus location.state setelah dibaca supaya notice tidak muncul lagi
   // saat kembali ke halaman ini (pola redirect-after-save).
   useEffect(() => {
     if (location.state?.notice) {
       navigate(location.pathname, { replace: true });
-      noticeTimerRef.current = setTimeout(() => setNotice(null), 5000);
     }
-    return () => {
-      if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Muat ulang dari store setiap halaman ini dikunjungi (data bisa berubah
-  // di halaman create/edit).
-  useEffect(() => {
-    setProjects(listProjects());
-  }, [location.key]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 500);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const filtered = useMemo(() => {
-    const q = debouncedSearchQuery.trim().toLowerCase();
-    return projects
-      .filter(
-        (p) =>
-          !q ||
-          [p.code, p.name, p.customer]
-            .map((v) => String(v || '').toLowerCase())
-            .some((v) => v.includes(q))
-      )
-      .slice()
-      .sort((a, b) => Number(b.id) - Number(a.id));
-  }, [projects, debouncedSearchQuery]);
+  const fetchProjectsData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await projectService.fetchProjects({
+        search: debouncedSearchQuery,
+        page: currentPage,
+        perPage: ITEMS_PER_PAGE,
+      });
+      if (response.status === 'ok') {
+        const lastPage = Math.max(1, response.meta.last_page);
+        if (response.data.length === 0 && currentPage > lastPage) {
+          setCurrentPage(lastPage);
+          return;
+        }
+        setProjects(response.data);
+        setTotalPages(response.meta.last_page);
+        setTotalItems(response.meta.total);
+      }
+    } catch (err) {
+      showNoticeRef.current('error', err.message || 'Gagal memuat data projek');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [debouncedSearchQuery, currentPage]);
 
-  const totalItems = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
-  const safePage = Math.min(currentPage, totalPages);
-  const pageRows = filtered.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
+  useEffect(() => {
+    fetchProjectsData();
+  }, [fetchProjectsData]);
 
   const handleResetFilter = () => {
     setSearchQuery('');
@@ -85,29 +101,31 @@ export default function Projek() {
     setTimeout(() => searchInputRef.current?.focus(), 0);
   };
 
-  const showNotice = (type, message) => {
-    setNotice({ type, message });
-    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
-    noticeTimerRef.current = setTimeout(() => setNotice(null), 5000);
-  };
-
-  // Hapus dari mock store (tanpa API).
-  const handleDeleteConfirm = () => {
+  // Hard delete via API (row benar-benar hilang dari tb_project).
+  const handleDeleteConfirm = async () => {
     const item = deleteConfirm.item;
     if (!item || deleteBusy) return;
     setDeleteBusy(true);
     try {
-      if (deleteProject(item.id)) {
-        setProjects(listProjects());
-        showNotice('success', 'Projek berhasil dihapus.');
-      } else {
-        showNotice('error', 'Gagal menghapus projek.');
-      }
-    } finally {
+      const res = await projectService.deleteProject(item.id);
       setDeleteConfirm({ isOpen: false, item: null });
+      if (res?.status === 'ok') {
+        showNoticeRef.current('success', 'Projek berhasil dihapus secara permanen.');
+        fetchProjectsData();
+      } else {
+        showNoticeRef.current('error', res?.message || 'Gagal menghapus projek.');
+      }
+    } catch (err) {
+      showNoticeRef.current('error', err.message || 'Gagal menghapus projek.');
+    } finally {
       setDeleteBusy(false);
     }
   };
+
+  const jenisLabel = (value) =>
+    PROJECT_JENIS.find((j) => j.value === value)?.label || value || '-';
+  const urgencyLabel = (value) =>
+    PROJECT_URGENCY.find((u) => u.value === value)?.label || value || '-';
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -173,6 +191,7 @@ export default function Projek() {
               variant="secondary"
               icon={RotateCcw}
               onClick={handleResetFilter}
+              disabled={isLoading}
               className="whitespace-nowrap"
             >
               Reset Filter
@@ -183,7 +202,11 @@ export default function Projek() {
 
       {/* Table */}
       <Card className="overflow-hidden !p-0">
-        {pageRows.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+          </div>
+        ) : projects.length === 0 ? (
           <EmptyState
             icon={FileText}
             title="Tidak ada projek"
@@ -216,17 +239,21 @@ export default function Projek() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {pageRows.map((p) => (
+                  {projects.map((p) => (
                     <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="py-4 px-6 text-sm font-medium text-text-primary">
                         {p.code}
                       </td>
                       <td className="py-4 px-6 text-sm text-text-primary">{p.name}</td>
-                      <td className="py-4 px-6 text-sm text-text-secondary">{p.customer}</td>
-                      <td className="py-4 px-6 text-sm text-text-secondary">{p.startDate || '-'}</td>
+                      <td className="py-4 px-6 text-sm text-text-secondary">
+                        {p.client || '-'}
+                      </td>
+                      <td className="py-4 px-6 text-sm text-text-secondary">
+                        {p.startDate || '-'}
+                      </td>
                       <td className="py-4 px-6 text-sm">
                         <Badge variant={PROJECT_STATUS_VARIANT[p.status] || 'default'}>
-                          {p.status}
+                          {projectStatusLabel(p.status)}
                         </Badge>
                       </td>
                       <td className="py-4 px-6">
@@ -261,7 +288,7 @@ export default function Projek() {
             </div>
             <div className="px-6 py-4 border-t border-border">
               <Pagination
-                currentPage={safePage}
+                currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
                 totalItems={totalItems}
@@ -287,23 +314,39 @@ export default function Projek() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Customer</p>
-                <p className="mt-1 text-sm text-text-primary">{viewItem.customer}</p>
+                <p className="mt-1 text-sm text-text-primary">{viewItem.client || '-'}</p>
               </div>
               <div>
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Status</p>
                 <p className="mt-1">
                   <Badge variant={PROJECT_STATUS_VARIANT[viewItem.status] || 'default'}>
-                    {viewItem.status}
+                    {projectStatusLabel(viewItem.status)}
                   </Badge>
                 </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Jenis</p>
+                <p className="mt-1 text-sm text-text-primary">{jenisLabel(viewItem.jenis)}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Urgency</p>
+                <p className="mt-1 text-sm text-text-primary">{urgencyLabel(viewItem.urgency)}</p>
               </div>
               <div>
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Tanggal Mulai</p>
                 <p className="mt-1 text-sm text-text-primary">{viewItem.startDate || '-'}</p>
               </div>
               <div>
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Tanggal Estimasi</p>
+                <p className="mt-1 text-sm text-text-primary">{viewItem.estimasiDate || '-'}</p>
+              </div>
+              <div>
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Tanggal Selesai</p>
                 <p className="mt-1 text-sm text-text-primary">{viewItem.endDate || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Harga</p>
+                <p className="mt-1 text-sm text-text-primary">{rupiah(viewItem.harga || 0)}</p>
               </div>
             </div>
             <div>
@@ -323,7 +366,7 @@ export default function Projek() {
         title="Hapus Projek?"
         message={`Apakah Anda yakin ingin menghapus projek ${
           deleteConfirm.item?.code || ''
-        }?\nData akan dihapus dari daftar dan tidak dapat dipulihkan.`}
+        }?\nData akan dihapus secara permanen dan tidak dapat dipulihkan.`}
         confirmLabel="Hapus"
         cancelLabel="Batal"
         loading={deleteBusy}

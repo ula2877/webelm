@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\SuratController;
 use App\Http\Controllers\SuratAssetController;
 use App\Http\Controllers\UserManagementController;
@@ -95,6 +96,13 @@ Route::middleware('auth')->group(function () {
     // table. Files go to the public disk; the absolute URL is stored in `path`.
     Route::get('/surat-assets', [SuratAssetController::class, 'index']);
     Route::post('/surat-assets', [SuratAssetController::class, 'store']);
+
+    // Projects - CRUD penuh atas tb_project existing (tanpa migration).
+    Route::get('/projects', [ProjectController::class, 'index']);
+    Route::post('/projects', [ProjectController::class, 'store']);
+    Route::get('/projects/{id}', [ProjectController::class, 'show']);
+    Route::put('/projects/{id}', [ProjectController::class, 'update']);
+    Route::delete('/projects/{id}', [ProjectController::class, 'destroy']);
 });
 
 // Fallback route for unauthenticated API requests

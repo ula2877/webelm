@@ -1,220 +1,73 @@
 // ============================================
-// PROJEK - mock store frontend sementara.
+// PROJEK - helper form & mapping frontend <-> API.
 //
-// TAHAP FRONTEND: belum ada backend/API/database untuk projek, jadi data
-// disimpan di module-level array + localStorage (bertahan saat navigasi
-// SPA maupun refresh). Bentuk interface mengikuti kontrak yang diminta:
+// Data lewat services/projects.js (tb_project). Nilai enum mengikuti
+// database apa adanya; label Indonesia hanya untuk tampilan:
+//   status: running/done/cancel -> Berjalan/Selesai/Dibatalkan
+//   jenis: pcb/project          -> PCB/Project
+//   urgency: urgent/normal/non-urgent
 //
-//   { id, code, name, customer, description, startDate, endDate, status }
-//
-// Saat backend siap, cukup ganti isi fungsi list/get/create/update/delete
-// dengan panggilan API - halaman tidak perlu diubah.
+// Kode projek <-> uuid_project, nama <-> judul, customer <-> id_client
+// (nama client dibaca dari tb_user), tanggal <-> kolom tanggal_*.
 // ============================================
 
-export const PROJECT_STATUS = ['Draft', 'Aktif', 'Selesai', 'Ditunda', 'Dibatalkan'];
+export const PROJECT_STATUS = [
+  { value: 'running', label: 'Berjalan' },
+  { value: 'done', label: 'Selesai' },
+  { value: 'cancel', label: 'Dibatalkan' },
+];
 
 // Status -> varian Badge existing (components/ui/Badge).
 export const PROJECT_STATUS_VARIANT = {
-  Draft: 'default',
-  Aktif: 'success',
-  Selesai: 'info',
-  Ditunda: 'warning',
-  Dibatalkan: 'error',
+  running: 'info',
+  done: 'success',
+  cancel: 'error',
 };
 
-const STORAGE_KEY = 'elmech-projects-v1';
-
-const SEED = [
-  {
-    id: 1,
-    code: 'PRJ/001/ELMECH/2026',
-    name: 'Sistem Monitoring Pabrik',
-    customer: 'PT Contoh Indonesia',
-    description: 'Pengembangan sistem monitoring mesin pabrik berbasis IoT.',
-    startDate: '2026-10-08',
-    endDate: '2026-12-20',
-    status: 'Aktif',
-  },
-  {
-    id: 2,
-    code: 'PRJ/002/ELMECH/2026',
-    name: 'Aplikasi Tracking Kapal',
-    customer: 'PSDKP Benoa',
-    description: 'Sistem tracking posisi kapal dan monitoring BBM kapal pengawas.',
-    startDate: '2026-06-12',
-    endDate: '2026-09-30',
-    status: 'Selesai',
-  },
-  {
-    id: 3,
-    code: 'PRJ/003/ELMECH/2026',
-    name: 'Instalasi Flowmeter BBM',
-    customer: 'PT Bahari Nusantara',
-    description: 'Pengadaan dan instalasi fuel flowmeter 8mm beserta kontroler GSM.',
-    startDate: '2026-08-01',
-    endDate: '2026-11-15',
-    status: 'Aktif',
-  },
-  {
-    id: 4,
-    code: 'PRJ/004/ELMECH/2026',
-    name: 'Maintenance Sistem SCADA',
-    customer: 'PT Pupuk Kalimantan Timur',
-    description: 'Kontrak pemeliharaan rutin sistem SCADA plant 1.',
-    startDate: '2026-01-05',
-    endDate: '2026-12-31',
-    status: 'Aktif',
-  },
-  {
-    id: 5,
-    code: 'PRJ/005/ELMECH/2026',
-    name: 'Pengadaan Hourmeter Digital',
-    customer: 'PT Pelabuhan Perikanan',
-    description: 'Pengadaan hourmeter digital untuk armada kapal.',
-    startDate: '2026-09-01',
-    endDate: '2026-10-31',
-    status: 'Ditunda',
-  },
-  {
-    id: 6,
-    code: 'PRJ/006/ELMECH/2026',
-    name: 'Sistem Realtime Tracking Armada',
-    customer: 'PT Logistik Samudra',
-    description: 'GPS tracking realtime untuk 25 unit armada truk.',
-    startDate: '2026-07-10',
-    endDate: '2026-10-10',
-    status: 'Selesai',
-  },
-  {
-    id: 7,
-    code: 'PRJ/007/ELMECH/2026',
-    name: 'Integrasi Sensor Suhu Cold Storage',
-    customer: 'PT Ikan Segar Abadi',
-    description: 'Integrasi sensor suhu ruang pendingin dengan dashboard monitoring.',
-    startDate: '2026-11-01',
-    endDate: '2027-01-31',
-    status: 'Draft',
-  },
-  {
-    id: 8,
-    code: 'PRJ/008/ELMECH/2026',
-    name: 'Upgrade Power Supply 24VDC',
-    customer: 'PT Dok Bahari',
-    description: 'Upgrade power supply peralatan navigasi dermaga.',
-    startDate: '2026-05-20',
-    endDate: '2026-06-20',
-    status: 'Dibatalkan',
-  },
+export const PROJECT_JENIS = [
+  { value: 'pcb', label: 'PCB' },
+  { value: 'project', label: 'Project' },
 ];
 
-// Cache memory di atas localStorage: CRUD tetap konsisten dalam sesi ini
-// bahkan bila localStorage tidak tersedia/korup; localStorage dipakai agar
-// data bertahan saat refresh (ditulis setiap ada perubahan).
-let memoryRows = null;
+export const PROJECT_URGENCY = [
+  { value: 'urgent', label: 'Mendesak' },
+  { value: 'normal', label: 'Normal' },
+  { value: 'non-urgent', label: 'Tidak Mendesak' },
+];
 
-function loadStore() {
-  if (memoryRows) return memoryRows.map((p) => ({ ...p }));
-  let rows = null;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) rows = parsed;
-    }
-  } catch {
-    // localStorage tidak tersedia / korup -> pakai seed di memory.
-  }
-  memoryRows = (rows || SEED).map((p) => ({ ...p }));
-  return memoryRows.map((p) => ({ ...p }));
+const STATUS_VALUES = PROJECT_STATUS.map((s) => s.value);
+const JENIS_VALUES = PROJECT_JENIS.map((s) => s.value);
+const URGENCY_VALUES = PROJECT_URGENCY.map((s) => s.value);
+
+export function projectStatusLabel(value) {
+  return PROJECT_STATUS.find((s) => s.value === value)?.label || value || '-';
 }
 
-function saveStore(rows) {
-  memoryRows = rows.map((p) => ({ ...p }));
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(memoryRows));
-  } catch {
-    // abaikan: state memory sesi ini tetap benar.
-  }
-}
-
-function nextId(rows) {
-  return rows.reduce((max, p) => Math.max(max, Number(p.id) || 0), 0) + 1;
-}
-
-/** Seluruh projek (salinan agar state internal tidak bocor). */
-export function listProjects() {
-  return loadStore().map((p) => ({ ...p }));
-}
-
-/** Satu projek by id, atau null bila tidak ada. */
-export function getProject(id) {
-  const rows = loadStore();
-  const found = rows.find((p) => String(p.id) === String(id));
-  return found ? { ...found } : null;
-}
-
-/** Tambah projek, mengembalikan record baru. */
-export function createProject(data) {
-  const rows = loadStore();
-  const record = {
-    id: nextId(rows),
-    code: String(data.code || '').trim(),
-    name: String(data.name || '').trim(),
-    customer: String(data.customer || '').trim(),
-    description: String(data.description || '').trim(),
-    startDate: data.startDate || '',
-    endDate: data.endDate || '',
-    status: PROJECT_STATUS.includes(data.status) ? data.status : 'Draft',
-  };
-  rows.push(record);
-  saveStore(rows);
-  return { ...record };
-}
-
-/** Ubah projek, mengembalikan record baru atau null bila id tak ada. */
-export function updateProject(id, data) {
-  const rows = loadStore();
-  const index = rows.findIndex((p) => String(p.id) === String(id));
-  if (index === -1) return null;
-  rows[index] = {
-    ...rows[index],
-    code: String(data.code || '').trim(),
-    name: String(data.name || '').trim(),
-    customer: String(data.customer || '').trim(),
-    description: String(data.description || '').trim(),
-    startDate: data.startDate || '',
-    endDate: data.endDate || '',
-    status: PROJECT_STATUS.includes(data.status) ? data.status : rows[index].status,
-  };
-  saveStore(rows);
-  return { ...rows[index] };
-}
-
-/** Hapus projek. Mengembalikan true bila ada yang dihapus. */
-export function deleteProject(id) {
-  const rows = loadStore();
-  const kept = rows.filter((p) => String(p.id) !== String(id));
-  if (kept.length === rows.length) return false;
-  saveStore(kept);
-  return true;
-}
-
-/** Validasi form create/edit. */
+/** Validasi form create/edit (mirror aturan backend, pesan Indonesia). */
 export function validateProject(form) {
   const errors = {};
-  if (!String(form.code || '').trim()) errors.code = 'Kode projek wajib diisi.';
+  if (!String(form.code || '').trim()) {
+    errors.code = 'Kode projek wajib diisi.';
+  } else if (String(form.code).trim().length > 30) {
+    errors.code = 'Kode projek maksimal 30 karakter.';
+  }
   if (!String(form.name || '').trim()) errors.name = 'Nama projek wajib diisi.';
-  if (!String(form.customer || '').trim()) errors.customer = 'Customer / instansi wajib diisi.';
+  if (!form.id_client) errors.id_client = 'Client wajib dipilih.';
   if (!String(form.startDate || '').trim()) errors.startDate = 'Tanggal mulai wajib diisi.';
-  if (!String(form.endDate || '').trim()) errors.endDate = 'Tanggal selesai wajib diisi.';
-  if (
-    form.startDate &&
-    form.endDate &&
-    String(form.endDate) < String(form.startDate)
-  ) {
+  if (!String(form.estimasiDate || '').trim()) {
+    errors.estimasiDate = 'Tanggal estimasi wajib diisi.';
+  }
+  if (!String(form.endDate || '').trim()) {
+    errors.endDate = 'Tanggal selesai wajib diisi.';
+  } else if (form.startDate && String(form.endDate) < String(form.startDate)) {
     errors.endDate = 'Tanggal selesai tidak boleh sebelum tanggal mulai.';
   }
-  if (!PROJECT_STATUS.includes(form.status)) errors.status = 'Status wajib dipilih.';
+  if (!JENIS_VALUES.includes(form.jenis)) errors.jenis = 'Jenis projek wajib dipilih.';
+  if (!STATUS_VALUES.includes(form.status)) errors.status = 'Status wajib dipilih.';
+  if (!URGENCY_VALUES.includes(form.urgency)) errors.urgency = 'Urgency wajib dipilih.';
+  if (form.harga !== '' && form.harga !== null && !(Number(form.harga) >= 0)) {
+    errors.harga = 'Harga tidak boleh negatif.';
+  }
   return { valid: Object.keys(errors).length === 0, errors };
 }
 
@@ -222,10 +75,52 @@ export function emptyProjectForm() {
   return {
     code: '',
     name: '',
-    customer: '',
+    id_client: '',
     description: '',
     startDate: '',
+    estimasiDate: '',
     endDate: '',
+    jenis: '',
     status: '',
+    urgency: 'normal',
+    harga: '',
+    is_proposed: false,
+  };
+}
+
+/** Detail API -> state form edit. */
+export function formFromProjectDetail(detail) {
+  const d = detail || {};
+  return {
+    code: d.code || d.uuid || '',
+    name: d.name || d.judul || '',
+    id_client: d.id_client || '',
+    description: d.description ?? d.deskripsi ?? '',
+    startDate: d.startDate || d.tanggal_mulai || '',
+    estimasiDate: d.estimasiDate || d.tanggal_estimasi || '',
+    endDate: d.endDate || d.tanggal_selesai || '',
+    jenis: d.jenis || '',
+    status: d.status || '',
+    urgency: d.urgency || 'normal',
+    harga: d.harga ?? '',
+    is_proposed: !!d.is_proposed,
+  };
+}
+
+/** State form -> payload API (kunci kolom tb_project). */
+export function buildProjectPayload(form) {
+  return {
+    uuid_project: String(form.code || '').trim() || null,
+    id_client: Number(form.id_client) || null,
+    judul: String(form.name || '').trim(),
+    jenis: form.jenis || null,
+    deskripsi: String(form.description || ''),
+    tanggal_mulai: form.startDate || null,
+    tanggal_estimasi: form.estimasiDate || null,
+    tanggal_selesai: form.endDate || null,
+    status: form.status || null,
+    urgency: form.urgency || 'normal',
+    harga: form.harga === '' || form.harga === null ? 0 : Number(form.harga),
+    is_proposed: !!form.is_proposed,
   };
 }
