@@ -238,10 +238,7 @@ export default function Projek() {
                 <thead>
                   <tr className="border-b border-border bg-gray-50/50">
                     <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      Nama Projek
-                    </th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      Customer
+                      Projek
                     </th>
                     <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
                       Tanggal Mulai
@@ -272,11 +269,14 @@ export default function Projek() {
                 <tbody className="divide-y divide-border">
                   {projects.map((p) => (
                     <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="py-4 px-6 text-sm font-medium text-text-primary">
-                        {p.name}
-                      </td>
-                      <td className="py-4 px-6 text-sm text-text-secondary">
-                        {p.client || '-'}
+                      {/* Kolom PROJEK: customer (atas, muted) + nama (bawah, bold). */}
+                      <td className="py-4 px-6">
+                        <p className="text-xs font-normal text-text-secondary leading-5">
+                          {p.client || '-'}
+                        </p>
+                        <p className="text-sm font-bold text-text-primary leading-5">
+                          {p.name}
+                        </p>
                       </td>
                       <td className="py-4 px-6 text-sm text-text-secondary whitespace-nowrap">
                         {p.startDate || '-'}
