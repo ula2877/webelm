@@ -247,16 +247,16 @@ export default function SuratOverview() {
         ))}
       </div>
 
-      {/* BARIS 2: 3 card x 30% di desktop (10 kolom, sisa 10% kosong).
+      {/* BARIS 2: 3 card x 33% di desktop (12 kolom, span 4).
           Tablet 2 kolom, mobile 1 kolom. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-10 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4">
         {JENIS_SURAT.slice(4).map((jenis) => (
           <JenisCard
             key={jenis.key}
             jenis={jenis}
             count={counts[jenis.key] ?? 0}
             isLoading={isLoading}
-            spanClass="lg:col-span-3"
+            spanClass="lg:col-span-4"
             onNavigate={handleNavigate}
             onManage={handleManageClick}
             onCreate={handleCreateClick}
