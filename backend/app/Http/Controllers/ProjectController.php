@@ -57,16 +57,27 @@ class ProjectController extends Controller
         $currentPage = (int) $request->query('page', 1);
         $currentPage = max(1, $currentPage);
 
-        $query = Project::query()->with('client');
+        // Agregat pembayaran sebagai subquery (withCount/withSum) + client
+        // di-eager-load: 1 query untuk seluruh halaman, tanpa N+1, tanpa
+        // memuat seluruh baris tb_pembayaran ke memori.
+        $query = Project::query()
+            ->with('client')
+            ->withCount([
+                'pembayaran as lunas_count' => fn ($q) => $q->where('pelunasan', 'lunas'),
+                'pembayaran as dp_count' => fn ($q) => $q->where('pelunasan', 'dp'),
+            ])
+            ->withSum('pembayaran as total_pembayaran', 'nominal');
 
-        // Search hits uuid_project, judul AND deskripsi.
+        // Search hits uuid_project, judul, deskripsi AND nama customer
+        // (relasi existing id_client -> tb_user, tanpa tabel baru).
         $search = trim((string) $request->query('search', ''));
         if ($search !== '') {
             $like = '%' . $this->escapeLike($search) . '%';
             $query->where(function ($inner) use ($like) {
                 $inner->where('uuid_project', 'like', $like)
                     ->orWhere('judul', 'like', $like)
-                    ->orWhere('deskripsi', 'like', $like);
+                    ->orWhere('deskripsi', 'like', $like)
+                    ->orWhereHas('client', fn ($q) => $q->where('nama', 'like', $like));
             });
         }
 
@@ -115,7 +126,7 @@ class ProjectController extends Controller
      */
     public function show(string $id): JsonResponse
     {
-        $project = Project::with('client')->find($id);
+        $project = Project::with(['client', 'team.worker', 'pembayaran'])->find($id);
 
         if (!$project) {
             return $this->notFound();
@@ -129,16 +140,22 @@ class ProjectController extends Controller
 
     /**
      * POST /api/projects
+     *
+     * Transaksional: tb_project + tb_tim (worker). Gagal di salah satu =
+     * rollback, tidak pernah ada project tanpa team yang diminta.
      */
     public function store(Request $request): JsonResponse
     {
         $validated = $this->validateProject($request);
 
-        $project = new Project();
-        $this->fillProject($project, $validated, $request);
-
         try {
-            $project->save();
+            $project = DB::transaction(function () use ($validated, $request) {
+                $project = new Project();
+                $this->fillProject($project, $validated, $request);
+                $project->save();
+                $this->syncTeam($project, $validated['worker_ids'] ?? []);
+                return $project;
+            });
         } catch (QueryException $e) {
             return $this->writeFailed('Gagal membuat projek baru.');
         }
@@ -146,12 +163,16 @@ class ProjectController extends Controller
         return response()->json([
             'status' => 'ok',
             'message' => 'Projek berhasil ditambahkan.',
-            'data' => $this->present($project->fresh()->load('client')),
+            'data' => $this->present($project->fresh()->load(['client', 'team.worker', 'pembayaran'])),
         ], 201);
     }
 
     /**
      * PUT /api/projects/{id}
+     *
+     * Transaksional. Worker di-replace HANYA untuk project ini: hapus
+     * baris tb_tim miliknya lalu insert ulang pilihan baru. Project lain
+     * tidak tersentuh.
      */
     public function update(Request $request, string $id): JsonResponse
     {
@@ -162,10 +183,13 @@ class ProjectController extends Controller
         }
 
         $validated = $this->validateProject($request);
-        $this->fillProject($project, $validated, $request);
 
         try {
-            $project->save();
+            DB::transaction(function () use ($project, $validated, $request) {
+                $this->fillProject($project, $validated, $request);
+                $project->save();
+                $this->syncTeam($project, $validated['worker_ids'] ?? []);
+            });
         } catch (QueryException $e) {
             return $this->writeFailed('Gagal menyimpan perubahan projek.');
         }
@@ -173,7 +197,7 @@ class ProjectController extends Controller
         return response()->json([
             'status' => 'ok',
             'message' => 'Projek berhasil diperbarui.',
-            'data' => $this->present($project->fresh()->load('client')),
+            'data' => $this->present($project->fresh()->load(['client', 'team.worker', 'pembayaran'])),
         ], 200);
     }
 
@@ -239,6 +263,10 @@ class ProjectController extends Controller
             // Kolom NOT NULL: null/absen disimpan sebagai 0.
             'harga' => ['nullable', 'integer', 'min:0'],
             'is_proposed' => ['sometimes', 'boolean'],
+            // Worker hanya sebagai daftar id tb_user yang ada; disimpan ke
+            // tb_tim (bukan ke tb_project). Kosong = tanpa worker, tetap sah.
+            'worker_ids' => ['nullable', 'array'],
+            'worker_ids.*' => ['integer', Rule::exists('tb_user', 'id_user')],
         ], [
             'uuid_project.max' => 'Kode projek maksimal 30 karakter.',
             'id_client.required' => 'Client wajib dipilih.',
@@ -256,6 +284,8 @@ class ProjectController extends Controller
             'urgency.required' => 'Urgency wajib dipilih.',
             'urgency.in' => 'Urgency tidak valid.',
             'harga.min' => 'Harga tidak boleh negatif.',
+            'worker_ids.array' => 'Daftar worker tidak valid.',
+            'worker_ids.*.exists' => 'Salah satu worker yang dipilih tidak tersedia.',
         ]);
     }
 
@@ -283,15 +313,100 @@ class ProjectController extends Controller
     }
 
     /**
+     * Replace relasi tb_tim milik project ini dengan daftar worker baru.
+     * Hanya baris milik id_project ini yang dihapus - project lain tidak
+     * tersentuh. Dipanggil di dalam transaction oleh store()/update().
+     */
+    private function syncTeam(Project $project, array $workerIds): void
+    {
+        DB::table('tb_tim')->where('id_project', $project->id_project)->delete();
+
+        $ids = array_values(array_unique(array_map(
+            fn ($id) => (int) $id,
+            array_filter($workerIds, fn ($id) => is_numeric($id))
+        )));
+        if ($ids === []) {
+            return;
+        }
+
+        DB::table('tb_tim')->insert(array_map(
+            fn (int $idWorker) => [
+                'id_project' => $project->id_project,
+                'id_worker' => $idWorker,
+            ],
+            $ids
+        ));
+    }
+
+    /**
+     * Status pelunasan dari agregat tb_pembayaran (prioritas lunas > dp):
+     *  - minimal satu 'lunas' -> 'lunas'
+     *  - selain itu minimal satu 'dp' -> 'dp'
+     *  - tanpa record -> 'belum_bayar'
+     *
+     * Terpisah dari tb_project.status (running/done/cancel) - keduanya
+     * tidak pernah dicampur. Enum DB (dp/lunas) tidak diubah.
+     */
+    private function resolvePelunasan(int $lunasCount, int $dpCount): string
+    {
+        if ($lunasCount > 0) {
+            return 'lunas';
+        }
+        if ($dpCount > 0) {
+            return 'dp';
+        }
+        return 'belum_bayar';
+    }
+
+    /**
      * The only place a project row is turned into an API payload.
      *
      * Besides the raw columns it carries frontend-friendly aliases
      * (id/code/name/customer/description/startDate/endDate) so the UI does
      * not have to rename database fields. Legacy zero-dates ('0000-00-00')
      * are mapped to null - never fabricated, never written back.
+     *
+     * Agregat pembayaran dibaca dari relasi yang di-eager-load bila ada,
+     * else dari atribut subquery withCount/withSum (jalur index) - tidak
+     * pernah query per-baris (tanpa N+1).
      */
     private function present(Project $project): array
     {
+        $workers = [];
+        $pembayaran = [];
+        if ($project->relationLoaded('team')) {
+            foreach ($project->team as $row) {
+                $workers[] = [
+                    'id' => (int) $row->id_worker,
+                    'nama' => $row->worker ? $row->worker->nama : null,
+                ];
+            }
+        }
+
+        if ($project->relationLoaded('pembayaran')) {
+            $lunasCount = 0;
+            $dpCount = 0;
+            $total = 0;
+            foreach ($project->pembayaran as $bayar) {
+                $total += (int) $bayar->nominal;
+                if ($bayar->pelunasan === 'lunas') {
+                    $lunasCount++;
+                } elseif ($bayar->pelunasan === 'dp') {
+                    $dpCount++;
+                }
+                $pembayaran[] = [
+                    'id' => (int) $bayar->id_pembayaran,
+                    'nominal' => (int) $bayar->nominal,
+                    'bukti_tf' => $bayar->bukti_tf,
+                    'pelunasan' => $bayar->pelunasan,
+                ];
+            }
+        } else {
+            $lunasCount = (int) ($project->lunas_count ?? 0);
+            $dpCount = (int) ($project->dp_count ?? 0);
+            $total = (int) ($project->total_pembayaran ?? 0);
+        }
+
         return [
             'id' => (int) $project->id_project,
             'uuid' => $project->uuid_project,
@@ -313,6 +428,12 @@ class ProjectController extends Controller
             'urgency' => $project->urgency,
             'harga' => (int) $project->harga,
             'is_proposed' => (bool) $project->is_proposed,
+            // Agregat pembayaran (bukan kolom tb_project).
+            'pelunasan' => $this->resolvePelunasan($lunasCount, $dpCount),
+            'total_pembayaran' => $total,
+            // Daftar worker (jalur detail) + daftar pembayaran (jalur detail).
+            'workers' => $workers,
+            'pembayaran' => $pembayaran,
         ];
     }
 

@@ -244,6 +244,47 @@ export default function CreateProjek() {
                   placeholder="Masukkan deskripsi projek"
                 />
               </div>
+              <div className="sm:col-span-2">
+                <span className="block text-sm font-medium text-text-primary mb-1.5">
+                  Worker (opsional)
+                </span>
+                <div className="rounded-lg border border-border bg-white px-3 py-2.5 max-h-48 overflow-y-auto">
+                  {clients.length === 0 ? (
+                    <p className="text-sm text-text-muted">Memuat daftar user...</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      {clients.map((c) => {
+                        const checked = (form.worker_ids || []).map(Number).includes(Number(c.id));
+                        return (
+                          <label
+                            key={c.id}
+                            className="flex items-center gap-2 text-sm text-text-primary cursor-pointer rounded px-1 py-1 hover:bg-gray-50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                const ids = (form.worker_ids || []).map(Number);
+                                setField(
+                                  'worker_ids',
+                                  e.target.checked
+                                    ? [...ids, Number(c.id)]
+                                    : ids.filter((id) => Number(id) !== Number(c.id))
+                                );
+                              }}
+                              className="w-4 h-4 rounded accent-primary-600"
+                            />
+                            <span className="truncate">{c.nama}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <p className="mt-1.5 text-xs text-text-muted">
+                  Worker terpilih disimpan ke tb_tim (boleh kosong).
+                </p>
+              </div>
               <Input
                 label="Tanggal Mulai"
                 type="date"

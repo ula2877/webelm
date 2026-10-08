@@ -69,4 +69,20 @@ class Project extends Model
     {
         return $this->belongsTo(User::class, 'id_client', 'id_user');
     }
+
+    /**
+     * Workers via tb_tim (0..N). Worker names come from tb_user.
+     */
+    public function team()
+    {
+        return $this->hasMany(Team::class, 'id_project', 'id_project');
+    }
+
+    /**
+     * Payments via tb_pembayaran (0..N).
+     */
+    public function pembayaran()
+    {
+        return $this->hasMany(Pembayaran::class, 'id_project', 'id_project');
+    }
 }

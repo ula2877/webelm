@@ -12,9 +12,9 @@
 // ============================================
 
 export const PROJECT_STATUS = [
-  { value: 'running', label: 'Berjalan' },
-  { value: 'done', label: 'Selesai' },
-  { value: 'cancel', label: 'Dibatalkan' },
+  { value: 'running', label: 'Running' },
+  { value: 'done', label: 'Done' },
+  { value: 'cancel', label: 'Cancelled' },
 ];
 
 // Status -> varian Badge existing (components/ui/Badge).
@@ -35,12 +35,40 @@ export const PROJECT_URGENCY = [
   { value: 'non-urgent', label: 'Tidak Mendesak' },
 ];
 
+export const PROJECT_URGENCY_VARIANT = {
+  urgent: 'error',
+  normal: 'default',
+  'non-urgent': 'info',
+};
+
+// Pelunasan dihitung backend dari tb_pembayaran (lunas > dp > belum_bayar).
+// Bukan kolom tb_project - hanya untuk tampilan.
+export const PROJECT_PELUNASAN = [
+  { value: 'belum_bayar', label: 'Belum Bayar' },
+  { value: 'dp', label: 'DP' },
+  { value: 'lunas', label: 'Lunas' },
+];
+
+export const PROJECT_PELUNASAN_VARIANT = {
+  belum_bayar: 'default',
+  dp: 'warning',
+  lunas: 'success',
+};
+
 const STATUS_VALUES = PROJECT_STATUS.map((s) => s.value);
 const JENIS_VALUES = PROJECT_JENIS.map((s) => s.value);
 const URGENCY_VALUES = PROJECT_URGENCY.map((s) => s.value);
 
 export function projectStatusLabel(value) {
   return PROJECT_STATUS.find((s) => s.value === value)?.label || value || '-';
+}
+
+export function projectPelunasanLabel(value) {
+  return PROJECT_PELUNASAN.find((s) => s.value === value)?.label || value || '-';
+}
+
+export function projectUrgencyLabel(value) {
+  return PROJECT_URGENCY.find((s) => s.value === value)?.label || value || '-';
 }
 
 /** Validasi form create/edit (mirror aturan backend, pesan Indonesia). */
@@ -85,10 +113,12 @@ export function emptyProjectForm() {
     urgency: 'normal',
     harga: '',
     is_proposed: false,
+    // Daftar id tb_user worker (disimpan ke tb_tim, bukan tb_project).
+    worker_ids: [],
   };
 }
 
-/** Detail API -> state form edit. */
+/** Detail API -> state form edit (termasuk worker existing dari tb_tim). */
 export function formFromProjectDetail(detail) {
   const d = detail || {};
   return {
@@ -104,6 +134,9 @@ export function formFromProjectDetail(detail) {
     urgency: d.urgency || 'normal',
     harga: d.harga ?? '',
     is_proposed: !!d.is_proposed,
+    worker_ids: Array.isArray(d.workers)
+      ? d.workers.map((w) => Number(w.id)).filter((n) => Number.isFinite(n))
+      : [],
   };
 }
 
@@ -122,5 +155,8 @@ export function buildProjectPayload(form) {
     urgency: form.urgency || 'normal',
     harga: form.harga === '' || form.harga === null ? 0 : Number(form.harga),
     is_proposed: !!form.is_proposed,
+    worker_ids: Array.isArray(form.worker_ids)
+      ? form.worker_ids.map((id) => Number(id)).filter((n) => Number.isFinite(n))
+      : [],
   };
 }

@@ -12,9 +12,13 @@ import * as projectService from '../services/projects';
 import { rupiah } from '../utils/suratJenis';
 import {
   PROJECT_JENIS,
+  PROJECT_PELUNASAN_VARIANT,
   PROJECT_STATUS_VARIANT,
   PROJECT_URGENCY,
+  PROJECT_URGENCY_VARIANT,
+  projectPelunasanLabel,
   projectStatusLabel,
+  projectUrgencyLabel,
 } from '../utils/projects';
 
 const ITEMS_PER_PAGE = 6;
@@ -99,6 +103,21 @@ export default function Projek() {
     setDebouncedSearchQuery('');
     setCurrentPage(1);
     setTimeout(() => searchInputRef.current?.focus(), 0);
+  };
+
+  // View mengambil detail lengkap (workers + pembayaran) via
+  // GET /api/projects/{id}; baris list hanya membawa agregat.
+  const handleView = async (id) => {
+    try {
+      const res = await projectService.fetchProjectDetail(id);
+      if (res?.status === 'ok' && res.data) {
+        setViewItem(res.data);
+      } else {
+        showNoticeRef.current('error', 'Gagal memuat detail projek.');
+      }
+    } catch (err) {
+      showNoticeRef.current('error', err.message || 'Gagal memuat detail projek.');
+    }
   };
 
   // Hard delete via API (row benar-benar hilang dari tb_project).
@@ -219,16 +238,28 @@ export default function Projek() {
                 <thead>
                   <tr className="border-b border-border bg-gray-50/50">
                     <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      Kode Projek
-                    </th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
                       Nama Projek
                     </th>
                     <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
                       Customer
                     </th>
                     <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      Tanggal
+                      Tanggal Mulai
+                    </th>
+                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
+                      Tanggal Estimasi
+                    </th>
+                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
+                      Tanggal Selesai
+                    </th>
+                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
+                      Harga
+                    </th>
+                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
+                      Pelunasan
+                    </th>
+                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
+                      Urgency
                     </th>
                     <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
                       Status
@@ -242,14 +273,32 @@ export default function Projek() {
                   {projects.map((p) => (
                     <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="py-4 px-6 text-sm font-medium text-text-primary">
-                        {p.code}
+                        {p.name}
                       </td>
-                      <td className="py-4 px-6 text-sm text-text-primary">{p.name}</td>
                       <td className="py-4 px-6 text-sm text-text-secondary">
                         {p.client || '-'}
                       </td>
-                      <td className="py-4 px-6 text-sm text-text-secondary">
+                      <td className="py-4 px-6 text-sm text-text-secondary whitespace-nowrap">
                         {p.startDate || '-'}
+                      </td>
+                      <td className="py-4 px-6 text-sm text-text-secondary whitespace-nowrap">
+                        {p.estimasiDate || '-'}
+                      </td>
+                      <td className="py-4 px-6 text-sm text-text-secondary whitespace-nowrap">
+                        {p.endDate || '-'}
+                      </td>
+                      <td className="py-4 px-6 text-sm text-text-secondary tabular-nums whitespace-nowrap">
+                        {rupiah(p.harga || 0)}
+                      </td>
+                      <td className="py-4 px-6 text-sm">
+                        <Badge variant={PROJECT_PELUNASAN_VARIANT[p.pelunasan] || 'default'}>
+                          {projectPelunasanLabel(p.pelunasan)}
+                        </Badge>
+                      </td>
+                      <td className="py-4 px-6 text-sm">
+                        <Badge variant={PROJECT_URGENCY_VARIANT[p.urgency] || 'default'}>
+                          {projectUrgencyLabel(p.urgency)}
+                        </Badge>
                       </td>
                       <td className="py-4 px-6 text-sm">
                         <Badge variant={PROJECT_STATUS_VARIANT[p.status] || 'default'}>
@@ -261,7 +310,7 @@ export default function Projek() {
                           <button
                             className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors"
                             title="Lihat"
-                            onClick={() => setViewItem(p)}
+                            onClick={() => handleView(p.id)}
                           >
                             <Eye className="w-4 h-4" />
                           </button>
@@ -354,6 +403,41 @@ export default function Projek() {
               <p className="mt-1 text-sm text-text-secondary whitespace-pre-line">
                 {viewItem.description || '-'}
               </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Worker</p>
+              <p className="mt-1 text-sm text-text-primary">
+                {Array.isArray(viewItem.workers) && viewItem.workers.length > 0
+                  ? viewItem.workers.map((w) => w.nama || `#${w.id}`).join(', ')
+                  : '-'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+                Pembayaran
+                <span className="ml-2 normal-case font-medium">
+                  (Total: {rupiah(viewItem.total_pembayaran || 0)})
+                </span>
+              </p>
+              {Array.isArray(viewItem.pembayaran) && viewItem.pembayaran.length > 0 ? (
+                <div className="mt-2 space-y-2">
+                  {viewItem.pembayaran.map((b) => (
+                    <div
+                      key={b.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2"
+                    >
+                      <span className="text-sm text-text-primary tabular-nums">
+                        {rupiah(b.nominal || 0)}
+                      </span>
+                      <Badge variant={PROJECT_PELUNASAN_VARIANT[b.pelunasan] || 'default'}>
+                        {projectPelunasanLabel(b.pelunasan)}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-1 text-sm text-text-muted">Belum ada pembayaran.</p>
+              )}
             </div>
           </div>
         )}
