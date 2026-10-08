@@ -170,7 +170,7 @@ export default function SuratOverview() {
             <Card
               key={jenis.key}
               className={`
-                ${jenis.bgColor} ${jenis.borderColor}
+                ${jenis.borderColor}
                 transition-all duration-200
                 hover:shadow-lg hover:-translate-y-1
                 flex flex-col
@@ -231,8 +231,11 @@ export default function SuratOverview() {
         })}
       </div>
 
-      {/* Recent Letters */}
-      <Card>
+      {/* Recent Letters - panel samping ~30% di desktop (3/10 kolom),
+          penuh di tablet/mobile. Baris compact stacked (bukan tabel) agar
+          tetap rapi di lebar sempit; semua data & tombol dipertahankan. */}
+      <div className="grid grid-cols-1 lg:grid-cols-10 gap-4">
+      <Card className="lg:col-span-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
             <Clock className="w-5 h-5 text-text-muted" />
@@ -258,47 +261,37 @@ export default function SuratOverview() {
             <p className="text-sm">Belum ada surat</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-gray-50/50">
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Nomor</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Jenis Surat</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Perihal</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Tanggal</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {recentLetters.map((s) => {
-                  // Find jenis label
-                  const jenisInfo = JENIS_SURAT.find(j => j.key === s.jenis);
-                  const jenisLabel = jenisInfo ? jenisInfo.label : s.jenis;
-                  
-                  return (
-                    <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="py-3 px-4 text-sm font-medium text-text-primary">{s.nomor || '-'}</td>
-                      <td className="py-3 px-4 text-sm text-text-secondary">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                          {jenisLabel}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-sm text-text-primary max-w-xs truncate">{s.perihal}</td>
-                      <td className="py-3 px-4 text-sm text-text-secondary">{s.tanggal}</td>
-                      <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => navigate(jenisInfo?.route || '/letters/quotation')}
-                          className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors"
-                          title="Lihat"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="space-y-3">
+            {recentLetters.map((s) => {
+              // Find jenis label
+              const jenisInfo = JENIS_SURAT.find(j => j.key === s.jenis);
+              const jenisLabel = jenisInfo ? jenisInfo.label : s.jenis;
+
+              return (
+                <div
+                  key={s.id}
+                  className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-gray-50/50 transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">{s.nomor || '-'}</p>
+                    <p className="mt-1 flex items-center gap-2 min-w-0">
+                      <span className="inline-flex shrink-0 items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 max-w-full truncate">
+                        {jenisLabel}
+                      </span>
+                      <span className="text-xs text-text-secondary shrink-0">{s.tanggal}</span>
+                    </p>
+                    <p className="mt-1 text-xs text-text-muted truncate">{s.perihal || '-'}</p>
+                  </div>
+                  <button
+                    onClick={() => navigate(jenisInfo?.route || '/letters/quotation')}
+                    className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors shrink-0"
+                    title="Lihat"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -308,6 +301,7 @@ export default function SuratOverview() {
           <span className="text-text-muted">Diperbarui: {new Date().toLocaleDateString('id-ID')}</span>
         </div>
       </Card>
+      </div>
     </div>
   );
 }
