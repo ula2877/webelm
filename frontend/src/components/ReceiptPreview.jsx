@@ -19,6 +19,7 @@ import {
 //   - zoom browser tidak menggeser posisi teks
 
 const BG_IMAGE = '/kwitansi.jpeg';
+const LOGO_IMAGE = '/logo_elmech2.png';
 
 /** Style posisional absolut dalam CM. */
 const at = (xCm, yCm, extra = {}) => ({
@@ -66,6 +67,13 @@ export default function ReceiptPreview({ form }) {
       <div className="kw-sheet" style={{ width: `${KW_WIDTH_CM}cm`, height: `${KW_HEIGHT_CM}cm` }}>
         {/* Background cetakan fisik - full page, di-stretch ke 23x9 cm. */}
         <img src={BG_IMAGE} alt="Kwitansi" className="kw-bg" />
+
+        {/* Logo ELMECH di panel vertikal kiri (strip x ~1.1-5.2cm).
+            Semua ukuran & posisi dalam CM seperti field lain, sehingga
+            ikut scaling zoom dan identik di PDF. */}
+        <div className="kw-logo-box" aria-hidden="true">
+          <img src={LOGO_IMAGE} alt="" className="kw-logo-img" />
+        </div>
 
         {/* No. */}
         <p className="kw-value kw-nomor" style={KW_POSISI.nomor}>

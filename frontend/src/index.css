@@ -949,6 +949,35 @@ body {
   -webkit-user-drag: none;
 }
 
+/* Logo ELMECH di panel vertikal kiri.
+   Kotak 4.1 x 7.0 cm di dalam border strip (x 1.1-5.2cm, y 1.0-8.0cm).
+   Logo horizontal (738x180) diputar -90deg sehingga tampil vertikal,
+   terpusat via flex; width diset + height auto = aspect ratio utuh.
+   Semua dalam CM (bukan px) supaya ikut zoom & identik di PDF. */
+.kw-logo-box {
+  position: absolute;
+  left: 1.1cm;
+  top: 1.0cm;
+  width: 4.1cm;
+  height: 7.0cm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+}
+.kw-logo-img {
+  width: 6.2cm;
+  height: auto;
+  display: block;
+  transform: rotate(-90deg);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
 /* Semua nilai field: tepat di atas garis putus-putus cetakan. */
 .kw-value {
   position: absolute;
