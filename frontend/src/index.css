@@ -921,7 +921,7 @@ body {
 /* ==========================================================================
    Kwitansi - template cetakan fisik 23 cm x 9 cm
    Posisi teks memakai CM (bukan px) supaya preview di layar beresolusi
-   berapa pun dan PDF 230mm x 90mm identik. Background = public/kwitansi.jpeg.
+   berapa pun dan PDF 230mm x 90mm identik. Background = public/kwitansi.jpg.
    ========================================================================== */
 
 .kw-root {

@@ -10,7 +10,7 @@ import {
 //
 // Berbeda dengan surat A4, kwitansi TIDAK memakai header/footer perusahaan
 // dan TIDAK punya tabel. Dokumen ini = background cetakan fisik 23 x 9 cm
-// (/kwitansi.jpeg) + teks yang di-overlay di koordinat CM.
+// (/kwitansi.jpg) + teks yang di-overlay di koordinat CM.
 //
 // SEMUA posisi didefinisikan dalam CM (bukan pixel) memakai helper `at()`,
 // sehingga:
@@ -30,13 +30,13 @@ const at = (xCm, yCm, extra = {}) => ({
 
 /**
  * Posisi tiap field di atas background kwitansi.
- * Angka dipilih dari inspeksi visual kwitansi.jpeg (794x346 px) lalu
+ * Angka dipilih dari inspeksi visual kwitansi.jpg (794x346 px) lalu
  * dikonversi ke CM lewat fraksi, sehingga aman terhadap peregangan.
  *
  * x_cm = (px / 794) * 23,  y_cm = (px / 346) * 9
  */
 export const KW_POSISI = {
-  // Angka di bawah dibaca dari kwitansi.jpeg + grid CM (kw-grid.png):
+  // Angka di bawah dibaca dari kwitansi.jpg + grid CM (kw-grid.png):
   //   - x_cm = px / 794 * 23,  y_cm = px / 346 * 9
   // Semua nilai ditulis SETELAH teks label tercetak dan TEPAT di garis putus.
   nomor: at(5.75, 1.15),
