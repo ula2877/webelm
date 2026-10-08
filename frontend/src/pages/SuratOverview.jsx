@@ -86,6 +86,75 @@ const JENIS_SURAT = [
   },
 ];
 
+// Satu card KPI jenis surat. Markup dibungkus di sini supaya Baris 1
+// (4 x 25%) dan Baris 2 (3 x 30%) memakai struktur visual yang identik -
+// hanya span grid-nya yang berbeda via prop spanClass.
+function JenisCard({ jenis, count, isLoading, spanClass, onNavigate, onManage, onCreate }) {
+  const Icon = jenis.icon;
+  return (
+    <Card
+      className={`
+        ${spanClass}
+        ${jenis.borderColor}
+        transition-all duration-200
+        hover:shadow-lg hover:-translate-y-1
+        flex flex-col
+      `}
+      onClick={() => onNavigate(jenis.route)}
+      onKeyDown={(e) => e.key === 'Enter' && onNavigate(jenis.route)}
+      tabIndex={0}
+      role="button"
+      aria-label={`Lihat ${jenis.label}, jumlah: ${count}`}
+    >
+      <div className="w-full flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-text-secondary uppercase tracking-wider truncate">
+            {jenis.label}
+          </p>
+          <div className="flex items-baseline gap-2 mt-2">
+            <span className={`text-3xl font-bold ${jenis.textColor}`}>
+              {isLoading ? (
+                <span className="w-16 h-8 bg-gray-200 animate-pulse rounded inline-block" />
+              ) : (
+                count
+              )}
+            </span>
+            {!isLoading && (
+              <span className={`text-sm font-medium ${jenis.textColor}`}>
+                Surat
+              </span>
+            )}
+          </div>
+        </div>
+        <div className={`p-3 rounded-xl ${jenis.bgColor} ${jenis.borderColor} shrink-0`}>
+          <Icon className={`w-8 h-8 ${jenis.textColor}`} />
+        </div>
+      </div>
+      {/* mt-auto menjangkar tombol ke bawah card sehingga posisi
+          tombol sejajar di semua card apa pun isi atasnya. */}
+      <div className="w-full mt-auto pt-4 border-t border-gray-200 flex items-center justify-between gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={ExternalLink}
+          className="flex-1 justify-center"
+          onClick={(e) => onManage(e, jenis.route)}
+        >
+          Kelola Surat
+        </Button>
+        <Button
+          size="sm"
+          icon={Plus}
+          className="flex-1 justify-center"
+          onClick={(e) => onCreate(e, jenis.createRoute)}
+        >
+          Buat Surat
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
 export default function SuratOverview() {
   const navigate = useNavigate();
   const [counts, setCounts] = useState({});
@@ -161,81 +230,42 @@ export default function SuratOverview() {
         </div>
       </div>
 
-      {/* KPI Cards Grid - 7 Jenis Surat */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {JENIS_SURAT.map((jenis) => {
-          const count = counts[jenis.key] ?? 0;
-          const Icon = jenis.icon;
-          return (
-            <Card
-              key={jenis.key}
-              className={`
-                ${jenis.borderColor}
-                transition-all duration-200
-                hover:shadow-lg hover:-translate-y-1
-                flex flex-col
-              `}
-              onClick={() => handleNavigate(jenis.route)}
-              onKeyDown={(e) => e.key === 'Enter' && handleNavigate(jenis.route)}
-              tabIndex={0}
-              role="button"
-              aria-label={`Lihat ${jenis.label}, jumlah: ${count}`}
-            >
-              <div className="w-full flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text-secondary uppercase tracking-wider truncate">
-                    {jenis.label}
-                  </p>
-                  <div className="flex items-baseline gap-2 mt-2">
-                    <span className={`text-3xl font-bold ${jenis.textColor}`}>
-                      {isLoading ? (
-                        <span className="w-16 h-8 bg-gray-200 animate-pulse rounded inline-block" />
-                      ) : (
-                        count
-                      )}
-                    </span>
-                    {!isLoading && (
-                      <span className={`text-sm font-medium ${jenis.textColor}`}>
-                        Surat
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className={`p-3 rounded-xl ${jenis.bgColor} ${jenis.borderColor} shrink-0`}>
-                  <Icon className={`w-8 h-8 ${jenis.textColor}`} />
-                </div>
-              </div>
-              {/* mt-auto menjangkar tombol ke bawah card sehingga posisi
-                  tombol sejajar di semua card apa pun isi atasnya. */}
-              <div className="w-full mt-auto pt-4 border-t border-gray-200 flex items-center justify-between gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={ExternalLink}
-                  className="flex-1 justify-center"
-                  onClick={(e) => handleManageClick(e, jenis.route)}
-                >
-                  Kelola Surat
-                </Button>
-                <Button
-                  size="sm"
-                  icon={Plus}
-                  className="flex-1 justify-center"
-                  onClick={(e) => handleCreateClick(e, jenis.createRoute)}
-                >
-                  Buat Surat
-                </Button>
-              </div>
-            </Card>
-          );
-        })}
+      {/* BARIS 1: 4 card x 25% di desktop (12 kolom).
+          Tablet 2 kolom, mobile 1 kolom. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4">
+        {JENIS_SURAT.slice(0, 4).map((jenis) => (
+          <JenisCard
+            key={jenis.key}
+            jenis={jenis}
+            count={counts[jenis.key] ?? 0}
+            isLoading={isLoading}
+            spanClass="lg:col-span-3"
+            onNavigate={handleNavigate}
+            onManage={handleManageClick}
+            onCreate={handleCreateClick}
+          />
+        ))}
       </div>
 
-      {/* Recent Letters - panel samping ~30% di desktop (3/10 kolom),
-          penuh di tablet/mobile. Baris compact stacked (bukan tabel) agar
-          tetap rapi di lebar sempit; semua data & tombol dipertahankan. */}
-      <div className="grid grid-cols-1 lg:grid-cols-10 gap-4">
-      <Card className="lg:col-span-3">
+      {/* BARIS 2: 3 card x 30% di desktop (10 kolom, sisa 10% kosong).
+          Tablet 2 kolom, mobile 1 kolom. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-10 gap-4">
+        {JENIS_SURAT.slice(4).map((jenis) => (
+          <JenisCard
+            key={jenis.key}
+            jenis={jenis}
+            count={counts[jenis.key] ?? 0}
+            isLoading={isLoading}
+            spanClass="lg:col-span-3"
+            onNavigate={handleNavigate}
+            onManage={handleManageClick}
+            onCreate={handleCreateClick}
+          />
+        ))}
+      </div>
+
+      {/* Recent Letters - 100% lebar container, layout tabel existing. */}
+      <Card>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
             <Clock className="w-5 h-5 text-text-muted" />
@@ -261,37 +291,47 @@ export default function SuratOverview() {
             <p className="text-sm">Belum ada surat</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {recentLetters.map((s) => {
-              // Find jenis label
-              const jenisInfo = JENIS_SURAT.find(j => j.key === s.jenis);
-              const jenisLabel = jenisInfo ? jenisInfo.label : s.jenis;
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border bg-gray-50/50">
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Nomor</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Jenis Surat</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Perihal</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Tanggal</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {recentLetters.map((s) => {
+                  // Find jenis label
+                  const jenisInfo = JENIS_SURAT.find(j => j.key === s.jenis);
+                  const jenisLabel = jenisInfo ? jenisInfo.label : s.jenis;
 
-              return (
-                <div
-                  key={s.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-gray-50/50 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text-primary truncate">{s.nomor || '-'}</p>
-                    <p className="mt-1 flex items-center gap-2 min-w-0">
-                      <span className="inline-flex shrink-0 items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 max-w-full truncate">
-                        {jenisLabel}
-                      </span>
-                      <span className="text-xs text-text-secondary shrink-0">{s.tanggal}</span>
-                    </p>
-                    <p className="mt-1 text-xs text-text-muted truncate">{s.perihal || '-'}</p>
-                  </div>
-                  <button
-                    onClick={() => navigate(jenisInfo?.route || '/letters/quotation')}
-                    className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors shrink-0"
-                    title="Lihat"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </button>
-                </div>
-              );
-            })}
+                  return (
+                    <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="py-3 px-4 text-sm font-medium text-text-primary">{s.nomor || '-'}</td>
+                      <td className="py-3 px-4 text-sm text-text-secondary">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                          {jenisLabel}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-sm text-text-primary max-w-xs truncate">{s.perihal}</td>
+                      <td className="py-3 px-4 text-sm text-text-secondary">{s.tanggal}</td>
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          onClick={() => navigate(jenisInfo?.route || '/letters/quotation')}
+                          className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                          title="Lihat"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
 
@@ -301,7 +341,6 @@ export default function SuratOverview() {
           <span className="text-text-muted">Diperbarui: {new Date().toLocaleDateString('id-ID')}</span>
         </div>
       </Card>
-      </div>
     </div>
   );
 }
