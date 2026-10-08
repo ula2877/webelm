@@ -28,6 +28,8 @@ import ViewSuratPaymentRequest from './pages/ViewSuratPaymentRequest';
 import SuratReceipt from './pages/SuratReceipt';
 import CreateSuratReceipt from './pages/CreateSuratReceipt';
 import ViewSuratReceipt from './pages/ViewSuratReceipt';
+import Projek from './pages/Projek';
+import CreateProjek from './pages/CreateProjek';
 import Profile from './pages/Profile';
 
 function LoadingScreen() {
@@ -121,6 +123,9 @@ function AppRoutes() {
         <Route path="/letters/receipt/create" element={<CreateSuratReceipt />} />
         <Route path="/letters/receipt/:id/edit" element={<CreateSuratReceipt />} />
         <Route path="/letters/receipt/:id/view" element={<ViewSuratReceipt />} />
+        <Route path="/projects" element={<Projek />} />
+        <Route path="/projects/create" element={<CreateProjek />} />
+        <Route path="/projects/:id/edit" element={<CreateProjek />} />
         <Route path="/profile" element={<Profile />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

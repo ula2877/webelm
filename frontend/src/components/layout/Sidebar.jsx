@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   Users,
   FileText,
+  FolderKanban,
   UserCircle,
   LogOut,
   ChevronLeft,
@@ -17,6 +18,7 @@ const menuItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/users', label: 'User', icon: Users },
   { path: '/letters', label: 'Surat', icon: FileText },
+  { path: '/projects', label: 'Projek', icon: FolderKanban },
 ];
 
 export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }) {
@@ -68,9 +70,10 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
         <nav className="flex-1 overflow-y-auto py-4 px-3">
           <ul className="space-y-1">
             {menuItems.map((item) => {
-              // For nested routes like /letters/*, check if path starts with the menu path
-              const isActive = item.path === '/letters'
-                ? location.pathname.startsWith('/letters')
+              // For nested routes like /letters/* and /projects/*, check if
+              // path starts with the menu path
+              const isActive = item.path === '/letters' || item.path === '/projects'
+                ? location.pathname.startsWith(item.path)
                 : location.pathname === item.path;
               return (
                 <li key={item.path}>
