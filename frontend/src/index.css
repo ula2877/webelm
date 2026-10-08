@@ -962,7 +962,7 @@ body {
    Semua dalam CM (bukan px) supaya ikut zoom & identik di PDF. */
 .kw-logo-box {
   position: absolute;
-  left: 0.0cm;
+  left: -0.85cm;
   top: 0.75cm;
   width: 6.0cm;
   height: 7.8cm;

@@ -18,7 +18,7 @@ import {
 //   - PDF 1:1 karena Chrome headless memakai unit CSS mm yang sama
 //   - zoom browser tidak menggeser posisi teks
 
-const BG_IMAGE = '/kwitansi.jpeg';
+const BG_IMAGE = '/kwitansi.jpg';
 const LOGO_IMAGE = '/logo_elmech2.png';
 
 /** Style posisional absolut dalam CM. */
@@ -39,24 +39,24 @@ export const KW_POSISI = {
   // Angka di bawah dibaca dari kwitansi.jpeg + grid CM (kw-grid.png):
   //   - x_cm = px / 794 * 23,  y_cm = px / 346 * 9
   // Semua nilai ditulis SETELAH teks label tercetak dan TEPAT di garis putus.
-  nomor: at(6.6, 1.15),
-  diterimaDari: at(9.85, 2.0),
-  nominalTerbilang: at(9.85, 3.025),
+  nomor: at(5.75, 1.15),
+  diterimaDari: at(9.0, 1.85),
+  nominalTerbilang: at(9.0, 2.725),
   // "Untuk pembayaran" punya 4 baris putus (y ~4.05 / 4.9 / 5.6 / 6.3 cm).
   // Lebar dibatasi s/d x=14.7cm supaya teks panjang TIDAK masuk zona
   // penandatangan (x 15.15-21.85cm); kelebihan dipotong terkontrol.
-  untukPembayaran: at(9.85, 3.75, { width: '12.1cm' }),
+  untukPembayaran: at(9.0, 3.25, { width: '12.1cm' }),
   // Kotak "Jumlah Rp." bergaris miring mulai x~8.5 cm; angka ditulis di dalamnya.
-  jumlahRp: at(9.0, 6.97),
+  jumlahRp: at(6.25, 7.0),
   // Blok penandatangan: wadah absolut; ISINYA hanya gambar + NAMA
   // (tanpa perusahaan & jabatan). Mengalir statis supaya tidak menumpuk.
   // x dikembalikan ke 15.15 (kanan, sejajar kotaTanggal); 1.15 menaruh
   // tanda tangan di stub dekoratif kiri.
-  penandatangan: at(15.85, 6.5, { width: '6.7cm' }),
+  penandatangan: at(15.85, 6.75, { width: '6.7cm' }),
   // Nomor invoice objek tersendiri: kanan, di antara nama & kota/tanggal.
-  nomorInvoice: at(5.35, 5.25, { width: '6.3cm' }),
+  nomorInvoice: at(8.55, 4.7, { width: '6.3cm' }),
   // Kota/tanggal di kanan bawah, sejajar kotak Jumlah Rp.
-  kotaTanggal: at(15.0, 6.1, { width: '6.3cm' }),
+  kotaTanggal: at(15.0, 5.35, { width: '6.3cm' }),
 };
 
 export default function ReceiptPreview({ form }) {

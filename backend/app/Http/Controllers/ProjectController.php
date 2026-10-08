@@ -47,7 +47,7 @@ class ProjectController extends Controller
 
     /**
      * GET /api/projects
-     * ?search=&status=&jenis=&page=&per_page=
+     * ?search=&status=&jenis=&urgency=&pelunasan=&page=&per_page=
      */
     public function index(Request $request): JsonResponse
     {
@@ -89,6 +89,38 @@ class ProjectController extends Controller
                 ]);
             }
             $query->where('status', $status);
+        }
+
+        $urgency = $request->query('urgency');
+        if ($urgency !== null && $urgency !== '' && $urgency !== 'all') {
+            if (!in_array($urgency, self::VALID_URGENCY, true)) {
+                throw ValidationException::withMessages([
+                    'urgency' => ['Filter urgency tidak valid.'],
+                ]);
+            }
+            $query->where('urgency', $urgency);
+        }
+
+        // Filter pelunasan memakai logika yang sama dengan present():
+        // lunas = minimal satu baris 'lunas'; dp = ada 'dp' tanpa 'lunas';
+        // belum_bayar = tanpa baris pembayaran sama sekali.
+        // whereHas/whereDoesntHave = subquery EXISTS: satu project tidak
+        // pernah ganda walau punya banyak baris tb_pembayaran.
+        $pelunasan = $request->query('pelunasan');
+        if ($pelunasan !== null && $pelunasan !== '' && $pelunasan !== 'all') {
+            if (!in_array($pelunasan, ['lunas', 'dp', 'belum_bayar'], true)) {
+                throw ValidationException::withMessages([
+                    'pelunasan' => ['Filter pelunasan tidak valid.'],
+                ]);
+            }
+            if ($pelunasan === 'lunas') {
+                $query->whereHas('pembayaran', fn ($q) => $q->where('pelunasan', 'lunas'));
+            } elseif ($pelunasan === 'dp') {
+                $query->whereHas('pembayaran', fn ($q) => $q->where('pelunasan', 'dp'))
+                    ->whereDoesntHave('pembayaran', fn ($q) => $q->where('pelunasan', 'lunas'));
+            } else {
+                $query->whereDoesntHave('pembayaran');
+            }
         }
 
         $jenis = $request->query('jenis');

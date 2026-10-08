@@ -3,9 +3,11 @@
 // ({status, data, meta}), error 422 membawa err.errors per-field.
 import api from './api';
 
-export async function fetchProjects({ search = '', status = '', jenis = '', page = 1, perPage = 6 } = {}) {
+export async function fetchProjects(
+  { search = '', status = '', jenis = '', urgency = '', pelunasan = '', page = 1, perPage = 6 } = {}
+) {
   const response = await api.get('/api/projects', {
-    params: { search, status, jenis, page, per_page: perPage },
+    params: { search, status, jenis, urgency, pelunasan, page, per_page: perPage },
   });
   return response.data;
 }

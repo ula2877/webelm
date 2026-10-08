@@ -12,7 +12,9 @@ import * as projectService from '../services/projects';
 import { rupiah } from '../utils/suratJenis';
 import {
   PROJECT_JENIS,
+  PROJECT_PELUNASAN,
   PROJECT_PELUNASAN_VARIANT,
+  PROJECT_STATUS,
   PROJECT_STATUS_VARIANT,
   PROJECT_URGENCY,
   PROJECT_URGENCY_VARIANT,
@@ -37,6 +39,9 @@ export default function Projek() {
   const [projects, setProjects] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [pelunasanFilter, setPelunasanFilter] = useState('');
+  const [urgencyFilter, setUrgencyFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -74,6 +79,9 @@ export default function Projek() {
     try {
       const response = await projectService.fetchProjects({
         search: debouncedSearchQuery,
+        pelunasan: pelunasanFilter,
+        urgency: urgencyFilter,
+        status: statusFilter,
         page: currentPage,
         perPage: ITEMS_PER_PAGE,
       });
@@ -92,7 +100,7 @@ export default function Projek() {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearchQuery, currentPage]);
+  }, [debouncedSearchQuery, pelunasanFilter, urgencyFilter, statusFilter, currentPage]);
 
   useEffect(() => {
     fetchProjectsData();
@@ -101,8 +109,16 @@ export default function Projek() {
   const handleResetFilter = () => {
     setSearchQuery('');
     setDebouncedSearchQuery('');
+    setPelunasanFilter('');
+    setUrgencyFilter('');
+    setStatusFilter('');
     setCurrentPage(1);
     setTimeout(() => searchInputRef.current?.focus(), 0);
+  };
+
+  const handleFilterChange = (setter) => (e) => {
+    setter(e.target.value);
+    setCurrentPage(1);
   };
 
   // View mengambil detail lengkap (workers + pembayaran) via
@@ -188,7 +204,7 @@ export default function Projek() {
 
       {/* Filters */}
       <Card>
-        <div className="flex flex-col md:flex-row gap-4">
+        <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
@@ -205,7 +221,46 @@ export default function Projek() {
               />
             </div>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <select
+              aria-label="Filter pelunasan"
+              value={pelunasanFilter}
+              onChange={handleFilterChange(setPelunasanFilter)}
+              className="w-full sm:w-44 rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option value="">Semua Pelunasan</option>
+              {PROJECT_PELUNASAN.filter((o) => o.value !== 'belum_bayar').map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="Filter urgency"
+              value={urgencyFilter}
+              onChange={handleFilterChange(setUrgencyFilter)}
+              className="w-full sm:w-44 rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option value="">Semua Urgency</option>
+              {PROJECT_URGENCY.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.value}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="Filter status"
+              value={statusFilter}
+              onChange={handleFilterChange(setStatusFilter)}
+              className="w-full sm:w-44 rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option value="">Semua Status</option>
+              {PROJECT_STATUS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
             <Button
               variant="secondary"
               icon={RotateCcw}
