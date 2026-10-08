@@ -933,6 +933,12 @@ body {
   overflow: hidden;
   background: #fff;
 }
+/* Dua sheet (hal. 1 background, hal. 2 polos) ditumpuk vertikal di preview. */
+.kw-document {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
 /* Background di-stretch penuh ke 23 x 9 cm.
    Catatan: rasio gambar 794x346 = 2,295 sedangkan ukuran cetakan 23:9 =
@@ -956,10 +962,10 @@ body {
    Semua dalam CM (bukan px) supaya ikut zoom & identik di PDF. */
 .kw-logo-box {
   position: absolute;
-  left: 1.1cm;
-  top: 1.0cm;
-  width: 4.1cm;
-  height: 7.0cm;
+  left: 0.0cm;
+  top: 0.75cm;
+  width: 6.0cm;
+  height: 7.8cm;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1135,15 +1141,25 @@ body {
     display: table-header-group;
   }
 
-  /* Kwitansi: satu sheet 230mm x 90mm, TIDAK memakai aturan .a4-page. */
+  /* Kwitansi: tiap sheet tepat satu halaman 230mm x 90mm,
+     TIDAK memakai aturan .a4-page. */
   #letter-print-root.kw-root {
     width: 230mm !important;
-    height: 90mm !important;
+    height: auto !important;
+  }
+  .kw-document {
+    display: block !important;
+    gap: 0 !important;
   }
   .kw-sheet {
     width: 230mm !important;
     height: 90mm !important;
     box-shadow: none !important;
+    margin: 0 !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+  .kw-sheet:last-child {
     page-break-after: auto !important;
     break-after: auto !important;
   }

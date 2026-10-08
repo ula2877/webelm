@@ -331,14 +331,23 @@ export const KW_PRINT_CSS = `
     left: 0 !important;
     top: 0 !important;
     width: 230mm !important;
-    height: 90mm !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
+  }
+  .kw-document {
+    display: block !important;
+    gap: 0 !important;
   }
   .kw-sheet {
     width: 230mm !important;
     height: 90mm !important;
     box-shadow: none !important;
+    margin: 0 !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+  .kw-sheet:last-child {
     page-break-after: auto !important;
     break-after: auto !important;
   }

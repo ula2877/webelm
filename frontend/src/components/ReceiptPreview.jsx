@@ -62,18 +62,22 @@ export const KW_POSISI = {
 export default function ReceiptPreview({ form }) {
   const nominal = Number(form.nominal) || 0;
 
-  return (
-    <div id="letter-print-root" className="letter-doc kw-root">
-      <div className="kw-sheet" style={{ width: `${KW_WIDTH_CM}cm`, height: `${KW_HEIGHT_CM}cm` }}>
-        {/* Background cetakan fisik - full page, di-stretch ke 23x9 cm. */}
+  // Isi satu sheet kwitansi. Sheet pertama memakai background cetakan
+  // fisik; sheet kedua (halaman 2 PDF) kontennya sama persis tetapi
+  // TANPA background.
+  const renderSheet = (withBackground) => (
+    <>
+      {withBackground ? (
+        /* Background cetakan fisik - full page, di-stretch ke 23x9 cm. */
         <img src={BG_IMAGE} alt="Kwitansi" className="kw-bg" />
+      ) : null}
 
-        {/* Logo ELMECH di panel vertikal kiri (strip x ~1.1-5.2cm).
-            Semua ukuran & posisi dalam CM seperti field lain, sehingga
-            ikut scaling zoom dan identik di PDF. */}
-        <div className="kw-logo-box" aria-hidden="true">
-          <img src={LOGO_IMAGE} alt="" className="kw-logo-img" />
-        </div>
+      {/* Logo ELMECH di panel vertikal kiri (strip x ~1.1-5.2cm).
+          Semua ukuran & posisi dalam CM seperti field lain, sehingga
+          ikut scaling zoom dan identik di PDF. */}
+      <div className="kw-logo-box" aria-hidden="true">
+        <img src={LOGO_IMAGE} alt="" className="kw-logo-img" />
+      </div>
 
         {/* No. */}
         <p className="kw-value kw-nomor" style={KW_POSISI.nomor}>
@@ -142,6 +146,22 @@ export default function ReceiptPreview({ form }) {
             ) : null}
           </div>
           <p className="kw-signer-line kw-signer-name">{form.signerName || '-'}</p>
+        </div>
+    </>
+  );
+
+  const sheetStyle = { width: `${KW_WIDTH_CM}cm`, height: `${KW_HEIGHT_CM}cm` };
+
+  return (
+    <div id="letter-print-root" className="letter-doc kw-root">
+      <div className="kw-document">
+        {/* Halaman 1: dengan background cetakan fisik. */}
+        <div className="kw-sheet" style={sheetStyle}>
+          {renderSheet(true)}
+        </div>
+        {/* Halaman 2: konten sama, TANPA background. */}
+        <div className="kw-sheet" style={sheetStyle}>
+          {renderSheet(false)}
         </div>
       </div>
     </div>
