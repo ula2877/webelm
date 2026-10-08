@@ -202,7 +202,7 @@ export default function SuratReceipt() {
           <p className="page-subtitle">Kelola kwitansi pembayaran</p>
         </div>
         <Button icon={Plus} onClick={() => navigate(`/${CFG.routeBase}/create`)}>
-          + Buat Kwitansi
+          Buat Kwitansi
         </Button>
       </div>
 

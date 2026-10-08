@@ -1,17 +1,15 @@
-import { FileText, Plus, ArrowRight, ChevronRight, TrendingUp, Loader2, Clock, ExternalLink } from 'lucide-react';
+import { FileText, Plus, Clock, ExternalLink } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
 import * as suratService from '../services/surat';
-import { formatDate } from '../utils/helpers';
 
 // 7 Jenis Surat lengkap sesuai enum database
 const JENIS_SURAT = [
   {
     key: 'quotation',
     label: 'Surat Penawaran',
-    shortLabel: 'Penawaran',
     route: '/letters/quotation',
     createRoute: '/letters/quotation/create',
     icon: FileText,
@@ -23,7 +21,6 @@ const JENIS_SURAT = [
   {
     key: 'invoice',
     label: 'Invoice',
-    shortLabel: 'Invoice',
     route: '/letters/invoice',
     createRoute: '/letters/invoice/create',
     icon: FileText,
@@ -35,7 +32,6 @@ const JENIS_SURAT = [
   {
     key: 'delivery-note',
     label: 'Surat Jalan',
-    shortLabel: 'Surat Jalan',
     route: '/letters/delivery-note',
     createRoute: '/letters/delivery-note/create',
     icon: FileText,
@@ -47,7 +43,6 @@ const JENIS_SURAT = [
   {
     key: 'bast',
     label: 'Berita Acara Serah Terima',
-    shortLabel: 'BAST',
     route: '/letters/handover',
     createRoute: '/letters/handover/create',
     icon: FileText,
@@ -59,7 +54,6 @@ const JENIS_SURAT = [
   {
     key: 'inspection-request',
     label: 'Surat Permohonan Pemeriksaan Hasil Pekerjaan',
-    shortLabel: 'Permohonan Pemeriksaan',
     route: '/letters/inspection-request',
     createRoute: '/letters/inspection-request/create',
     icon: FileText,
@@ -71,7 +65,6 @@ const JENIS_SURAT = [
   {
     key: 'payment-request',
     label: 'Surat Permohonan Pembayaran',
-    shortLabel: 'Permohonan Pembayaran',
     route: '/letters/payment-request',
     createRoute: '/letters/payment-request/create',
     icon: FileText,
@@ -83,7 +76,6 @@ const JENIS_SURAT = [
   {
     key: 'kuitansi',
     label: 'Kwitansi',
-    shortLabel: 'Kwitansi',
     route: '/letters/receipt',
     createRoute: '/letters/receipt/create',
     icon: FileText,
@@ -204,7 +196,7 @@ export default function SuratOverview() {
                     </span>
                     {!isLoading && (
                       <span className={`text-sm font-medium ${jenis.textColor}`}>
-                        {count === 1 ? 'Surat' : 'Surat'}
+                        Surat
                       </span>
                     )}
                   </div>
@@ -213,7 +205,9 @@ export default function SuratOverview() {
                   <Icon className={`w-8 h-8 ${jenis.textColor}`} />
                 </div>
               </div>
-              <div className="w-full mt-4 pt-4 border-t border-gray-200 flex items-center justify-between gap-2">
+              {/* mt-auto menjangkar tombol ke bawah card sehingga posisi
+                  tombol sejajar di semua card apa pun isi atasnya. */}
+              <div className="w-full mt-auto pt-4 border-t border-gray-200 flex items-center justify-between gap-2">
                 <Button
                   variant="secondary"
                   size="sm"
