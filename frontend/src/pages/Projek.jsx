@@ -7,11 +7,9 @@ import Badge from '../components/ui/Badge';
 import Pagination from '../components/ui/Pagination';
 import EmptyState from '../components/ui/EmptyState';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
-import Modal from '../components/ui/Modal';
 import * as projectService from '../services/projects';
 import { rupiah } from '../utils/suratJenis';
 import {
-  PROJECT_JENIS,
   PROJECT_PELUNASAN,
   PROJECT_PELUNASAN_VARIANT,
   PROJECT_STATUS,
@@ -32,7 +30,7 @@ const CFG = {
 // Halaman list Projek (data dari GET /api/projects).
 // Pola UI/behavior mengikuti halaman Surat: search debounce (500ms) +
 // Reset Filter, tabel KODE|NAMA|CUSTOMER|TANGGAL|STATUS|AKSI, aksi icon
-// View (modal detail) / Edit / Delete (confirm dialog), pagination server.
+// View (halaman detail) / Edit / Delete (confirm dialog), pagination server.
 export default function Projek() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -47,7 +45,6 @@ export default function Projek() {
   const [totalItems, setTotalItems] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [notice, setNotice] = useState(location.state?.notice || null);
-  const [viewItem, setViewItem] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, item: null });
   const [deleteBusy, setDeleteBusy] = useState(false);
 
@@ -121,19 +118,9 @@ export default function Projek() {
     setCurrentPage(1);
   };
 
-  // View mengambil detail lengkap (workers + pembayaran) via
-  // GET /api/projects/{id}; baris list hanya membawa agregat.
-  const handleView = async (id) => {
-    try {
-      const res = await projectService.fetchProjectDetail(id);
-      if (res?.status === 'ok' && res.data) {
-        setViewItem(res.data);
-      } else {
-        showNoticeRef.current('error', 'Gagal memuat detail projek.');
-      }
-    } catch (err) {
-      showNoticeRef.current('error', err.message || 'Gagal memuat detail projek.');
-    }
+  // Navigate to view page for project detail using UUID.
+  const handleView = (uuid) => {
+    navigate(`/projects/${uuid}/view`);
   };
 
   // Hard delete via API (row benar-benar hilang dari tb_project).
@@ -157,8 +144,6 @@ export default function Projek() {
     }
   };
 
-  const jenisLabel = (value) =>
-    PROJECT_JENIS.find((j) => j.value === value)?.label || value || '-';
   const urgencyLabel = (value) =>
     PROJECT_URGENCY.find((u) => u.value === value)?.label || value || '-';
 
@@ -327,7 +312,7 @@ export default function Projek() {
                       {/* Kolom PROJEK: customer (atas, muted) + nama (bawah, bold). */}
                       <td className="py-4 px-6">
                         <p className="text-xs font-normal text-text-secondary leading-5">
-                          {p.client || '-'}
+                          {p.client?.nama || '-'}
                         </p>
                         <p className="text-sm font-bold text-text-primary leading-5">
                           {p.name}
@@ -365,14 +350,14 @@ export default function Projek() {
                           <button
                             className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors"
                             title="Lihat"
-                            onClick={() => handleView(p.id)}
+                            onClick={() => handleView(p.uuid)}
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
                             className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors"
                             title="Edit"
-                            onClick={() => navigate(`/${CFG.routeBase}/${p.id}/edit`)}
+                            onClick={() => navigate(`/${CFG.routeBase}/${p.uuid}/edit`)}
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
@@ -402,101 +387,6 @@ export default function Projek() {
           </>
         )}
       </Card>
-
-      {/* Detail projek (read-only, tanpa route tambahan). */}
-      <Modal isOpen={!!viewItem} onClose={() => setViewItem(null)} title="Detail Projek">
-        {viewItem && (
-          <div className="p-6 space-y-4">
-            <div>
-              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Kode Projek</p>
-              <p className="mt-1 text-sm font-medium text-text-primary">{viewItem.code}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Nama Projek</p>
-              <p className="mt-1 text-sm text-text-primary">{viewItem.name}</p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Customer</p>
-                <p className="mt-1 text-sm text-text-primary">{viewItem.client || '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Status</p>
-                <p className="mt-1">
-                  <Badge variant={PROJECT_STATUS_VARIANT[viewItem.status] || 'default'}>
-                    {projectStatusLabel(viewItem.status)}
-                  </Badge>
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Jenis</p>
-                <p className="mt-1 text-sm text-text-primary">{jenisLabel(viewItem.jenis)}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Urgency</p>
-                <p className="mt-1 text-sm text-text-primary">{urgencyLabel(viewItem.urgency)}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Tanggal Mulai</p>
-                <p className="mt-1 text-sm text-text-primary">{viewItem.startDate || '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Tanggal Estimasi</p>
-                <p className="mt-1 text-sm text-text-primary">{viewItem.estimasiDate || '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Tanggal Selesai</p>
-                <p className="mt-1 text-sm text-text-primary">{viewItem.endDate || '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Harga</p>
-                <p className="mt-1 text-sm text-text-primary">{rupiah(viewItem.harga || 0)}</p>
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Deskripsi</p>
-              <p className="mt-1 text-sm text-text-secondary whitespace-pre-line">
-                {viewItem.description || '-'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Worker</p>
-              <p className="mt-1 text-sm text-text-primary">
-                {Array.isArray(viewItem.workers) && viewItem.workers.length > 0
-                  ? viewItem.workers.map((w) => w.nama || `#${w.id}`).join(', ')
-                  : '-'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-                Pembayaran
-                <span className="ml-2 normal-case font-medium">
-                  (Total: {rupiah(viewItem.total_pembayaran || 0)})
-                </span>
-              </p>
-              {Array.isArray(viewItem.pembayaran) && viewItem.pembayaran.length > 0 ? (
-                <div className="mt-2 space-y-2">
-                  {viewItem.pembayaran.map((b) => (
-                    <div
-                      key={b.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2"
-                    >
-                      <span className="text-sm text-text-primary tabular-nums">
-                        {rupiah(b.nominal || 0)}
-                      </span>
-                      <Badge variant={PROJECT_PELUNASAN_VARIANT[b.pelunasan] || 'default'}>
-                        {projectPelunasanLabel(b.pelunasan)}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-1 text-sm text-text-muted">Belum ada pembayaran.</p>
-              )}
-            </div>
-          </div>
-        )}
-      </Modal>
 
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}

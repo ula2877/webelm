@@ -30,6 +30,7 @@ import CreateSuratReceipt from './pages/CreateSuratReceipt';
 import ViewSuratReceipt from './pages/ViewSuratReceipt';
 import Projek from './pages/Projek';
 import CreateProjek from './pages/CreateProjek';
+import ViewProjek from './pages/ViewProjek';
 import Profile from './pages/Profile';
 
 function LoadingScreen() {
@@ -125,7 +126,8 @@ function AppRoutes() {
         <Route path="/letters/receipt/:id/view" element={<ViewSuratReceipt />} />
         <Route path="/projects" element={<Projek />} />
         <Route path="/projects/create" element={<CreateProjek />} />
-        <Route path="/projects/:id/edit" element={<CreateProjek />} />
+        <Route path="/projects/:uuid/edit" element={<CreateProjek />} />
+        <Route path="/projects/:uuid/view" element={<ViewProjek />} />
         <Route path="/profile" element={<Profile />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

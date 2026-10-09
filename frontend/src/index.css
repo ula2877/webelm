@@ -1022,6 +1022,134 @@ body {
   text-align: right;
 }
 
+/* ==========================================================================
+   Rich text editor deskripsi projek (Tiptap/ProseMirror).
+   Mengikuti gaya input existing: teks sm, fokus tanpa outline default
+   (ring ditangani wrapper), konten dasar rapi tanpa plugin typography.
+   ========================================================================== */
+.rte-content {
+  /* Tinggi area tulis mengikuti wrapper yang bisa di-resize; wrapper pembungkus
+     (EditorContent) memakai h-full agar rantai `height: 100%` terhubung.
+     Konten yang melebihi tinggi akan scroll di dalam area ini. */
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+  height: 100%;
+  overflow-y: auto;
+}
+.rte-content:focus {
+  outline: none;
+}
+.rte-content p {
+  margin: 0 0 0.5em;
+}
+.rte-content h1,
+.rte-content h2,
+.rte-content h3 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0.75em 0 0.4em;
+}
+.rte-content h1 { font-size: 1.25rem; }
+.rte-content h2 { font-size: 1.125rem; }
+.rte-content h3 { font-size: 1rem; }
+.rte-content ul,
+.rte-content ol {
+  margin: 0 0 0.5em 1.25rem;
+  padding: 0;
+}
+.rte-content ul { list-style: disc; }
+.rte-content ol { list-style: decimal; }
+.rte-content a {
+  color: var(--color-primary-600);
+  text-decoration: underline;
+}
+.rte-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 0.5em 0;
+}
+.rte-content s { text-decoration: line-through; }
+.rte-content u { text-decoration: underline; }
+.rte-content.is-editor-empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-text-muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   Rendering deskripsi projek pada halaman View Projek (HTML dari WYSIWYG).
+   Dipisah dari .rte-content agar style editor tidak ikut berubah. Tanpa blok
+   ini, Preflight Tailwind (reset) menghilangkan ukuran heading, bullet list,
+   jarak paragraf, dan tampilan tautan sehingga HTML tampak seperti teks biasa.
+   ========================================================================== */
+.project-description-content {
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--color-text-primary);
+  overflow-wrap: break-word;
+}
+.project-description-content > :first-child {
+  margin-top: 0;
+}
+.project-description-content > :last-child {
+  margin-bottom: 0;
+}
+
+.project-description-content p {
+  margin: 0 0 0.75em;
+}
+
+.project-description-content h1,
+.project-description-content h2,
+.project-description-content h3 {
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-text-primary);
+  margin: 1.1em 0 0.5em;
+}
+.project-description-content h1 { font-size: 1.5rem; }
+.project-description-content h2 { font-size: 1.25rem; }
+.project-description-content h3 { font-size: 1.075rem; }
+
+.project-description-content ul,
+.project-description-content ol {
+  margin: 0 0 0.75em;
+  padding-left: 1.5rem;
+}
+.project-description-content ul { list-style: disc; }
+.project-description-content ol { list-style: decimal; }
+.project-description-content li { margin: 0.25em 0; }
+.project-description-content li > p { margin: 0; }
+
+.project-description-content strong,
+.project-description-content b { font-weight: 700; }
+.project-description-content em,
+.project-description-content i { font-style: italic; }
+.project-description-content s { text-decoration: line-through; }
+.project-description-content u { text-decoration: underline; }
+
+.project-description-content a {
+  color: var(--color-primary-600);
+  text-decoration: underline;
+  cursor: pointer;
+  overflow-wrap: break-word;
+}
+.project-description-content a:hover {
+  color: var(--color-primary-700);
+}
+
+.project-description-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 0.5em 0;
+}
+
 /* Blok penandatangan di kanan bawah (gaya sama dengan surat lain:
    nama perusahaan -> tanda tangan/stempel -> nama -> jabatan).
    Wadahnya absolut; ISINYA blok statis supaya tidak menumpuk. */

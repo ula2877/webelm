@@ -102,4 +102,78 @@ return [
         'max_kb' => 4096,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Project File Storage
+    |--------------------------------------------------------------------------
+    |
+    | Project files are stored as files and recorded in the EXISTING tb_files
+    | table (id_parent -> tb_project.id_project). No schema change is involved.
+    |
+    | This feature uses the same public disk and storage pattern as other
+    | file uploads in the application.
+    |
+    */
+
+    'project_file' => [
+
+        // Laravel filesystem disk used to store the uploaded files.
+        'disk' => 'public',
+
+        // Folder inside the disk, i.e. storage/app/public/project-files/.
+        // Served publicly through public/storage as /storage/project-files/<file>.
+        'directory' => 'project-files',
+
+        // Extensions accepted by the project file upload endpoint.
+        'mimes' => [
+            'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+            'jpg', 'jpeg', 'png', 'webp', 'gif',
+            'zip', 'rar', '7z',
+            'txt', 'csv',
+        ],
+
+        // Maximum accepted upload size in kilobytes.
+        'max_kb' => 20480, // 20 MB
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Project File Public URL
+    |--------------------------------------------------------------------------
+    |
+    | tb_files.path menyimpan FULL URL file (format "<base_url>/files/<nama>").
+    | Domain diambil dari konfigurasi (default mengikuti APP_URL) supaya tidak
+    | di-hardcode. File fisik tetap di disk `public` di folder project_file
+    | dan dilayani melalui route GET /files/{filename} (ProjectController@serveFile).
+    |
+    */
+    'project_file_url' => [
+        'base_url' => rtrim(env('PROJECT_FILE_BASE_URL', env('APP_URL', 'http://127.0.0.1:8000')), '/'),
+        'prefix' => 'files',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Project Progress Attachments
+    |--------------------------------------------------------------------------
+    |
+    | Lampiran pada satu catatan progress disimpan memakai mekanisme yang SAMA
+    | dengan Project File (tb_files + kolom `path`). File fisik disimpan pada
+    | folder project_file.directory ("project-files") supaya endpoint download
+    | File Manager tetap dapat melayaninya tanpa endpoint/aturan baru.
+    |
+    | Batasan yang berlaku:
+    |   - mimes & max_kb per file mengikuti project_file (20 MB per file).
+    |   - max_files membatasi jumlah lampiran per satu catatan progress.
+    |   - Server PHP membatasi total request (post_max_size = 40 MB), jadi total
+    |     seluruh lampiran dalam satu request tidak boleh melebihi itu.
+    |   - tb_progress.id_file menyimpan JSON array ID tb_files; kolomnya
+    |     varchar(100) sehingga controller memverifikasi panjang JSON sebelum
+    |     menyimpan (max_files = 10 aman di bawah 100 karakter).
+    |
+    */
+    'project_progress' => [
+        'max_files' => 10,
+    ],
+
 ];

@@ -39,22 +39,22 @@ export const KW_POSISI = {
   // Angka di bawah dibaca dari kwitansi.jpg + grid CM (kw-grid.png):
   //   - x_cm = px / 794 * 23,  y_cm = px / 346 * 9
   // Semua nilai ditulis SETELAH teks label tercetak dan TEPAT di garis putus.
-  nomor: at(5.75, 1.15),
-  diterimaDari: at(9.0, 1.85),
-  nominalTerbilang: at(9.0, 2.725),
+  nomor: at(5.95, 1.15),
+  diterimaDari: at(9.2, 1.85),
+  nominalTerbilang: at(9.2, 2.725),
   // "Untuk pembayaran" punya 4 baris putus (y ~4.05 / 4.9 / 5.6 / 6.3 cm).
   // Lebar dibatasi s/d x=14.7cm supaya teks panjang TIDAK masuk zona
   // penandatangan (x 15.15-21.85cm); kelebihan dipotong terkontrol.
-  untukPembayaran: at(9.0, 3.25, { width: '12.1cm' }),
+  untukPembayaran: at(9.2, 3.25, { width: '12.1cm' }),
   // Kotak "Jumlah Rp." bergaris miring mulai x~8.5 cm; angka ditulis di dalamnya.
-  jumlahRp: at(6.25, 7.0),
+  jumlahRp: at(6.45, 7.0),
   // Blok penandatangan: wadah absolut; ISINYA hanya gambar + NAMA
   // (tanpa perusahaan & jabatan). Mengalir statis supaya tidak menumpuk.
   // x dikembalikan ke 15.15 (kanan, sejajar kotaTanggal); 1.15 menaruh
   // tanda tangan di stub dekoratif kiri.
-  penandatangan: at(15.85, 6.75, { width: '6.7cm' }),
+  penandatangan: at(15.85, 7.25, { width: '6.7cm' }),
   // Nomor invoice objek tersendiri: kanan, di antara nama & kota/tanggal.
-  nomorInvoice: at(8.55, 4.7, { width: '6.3cm' }),
+  nomorInvoice: at(8.75, 4.7, { width: '6.3cm' }),
   // Kota/tanggal di kanan bawah, sejajar kotak Jumlah Rp.
   kotaTanggal: at(15.0, 5.35, { width: '6.3cm' }),
 };

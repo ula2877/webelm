@@ -98,11 +98,41 @@ Route::middleware('auth')->group(function () {
     Route::post('/surat-assets', [SuratAssetController::class, 'store']);
 
     // Projects - CRUD penuh atas tb_project existing (tanpa migration).
+    // Upload gambar deskripsi (file-only, tanpa record database).
+    Route::post('/projects/description-image', [ProjectController::class, 'descriptionImage']);
     Route::get('/projects', [ProjectController::class, 'index']);
     Route::post('/projects', [ProjectController::class, 'store']);
-    Route::get('/projects/{id}', [ProjectController::class, 'show']);
-    Route::put('/projects/{id}', [ProjectController::class, 'update']);
-    Route::delete('/projects/{id}', [ProjectController::class, 'destroy']);
+    // UUID route must come before {id} route to avoid conflicts
+    Route::get('/projects/uuid/{uuid}', [ProjectController::class, 'showByUuid'])
+        ->where('uuid', '[a-zA-Z0-9\-]+');
+    Route::put('/projects/uuid/{uuid}', [ProjectController::class, 'updateByUuid'])
+        ->where('uuid', '[a-zA-Z0-9\-]+');
+    
+    // Project File Manager - menggunakan UUID untuk identifikasi project
+    Route::get('/projects/uuid/{uuid}/files', [ProjectController::class, 'getFiles'])
+        ->where('uuid', '[a-zA-Z0-9\-]+');
+    Route::post('/projects/uuid/{uuid}/files', [ProjectController::class, 'uploadFile'])
+        ->where('uuid', '[a-zA-Z0-9\-]+');
+    Route::get('/projects/uuid/{uuid}/files/{fileId}', [ProjectController::class, 'downloadFile'])
+        ->where('uuid', '[a-zA-Z0-9\-]+')
+        ->where('fileId', '[0-9]+');
+    Route::delete('/projects/uuid/{uuid}/files/{fileId}', [ProjectController::class, 'deleteFile'])
+        ->where('uuid', '[a-zA-Z0-9\-]+')
+        ->where('fileId', '[0-9]+');
+
+    // Project Progress - tb_progress via UUID. id_project selalu di-resolve
+    // dari uuid_project di URL; tidak pernah diterima dari input client.
+    Route::get('/projects/uuid/{uuid}/progress', [ProjectController::class, 'getProgress'])
+        ->where('uuid', '[a-zA-Z0-9\-]+');
+    Route::post('/projects/uuid/{uuid}/progress', [ProjectController::class, 'addProgress'])
+        ->where('uuid', '[a-zA-Z0-9\-]+');
+
+    Route::get('/projects/{id}', [ProjectController::class, 'show'])
+        ->where('id', '[0-9]+');
+    Route::put('/projects/{id}', [ProjectController::class, 'update'])
+        ->where('id', '[0-9]+');
+    Route::delete('/projects/{id}', [ProjectController::class, 'destroy'])
+        ->where('id', '[0-9]+');
 });
 
 // Fallback route for unauthenticated API requests

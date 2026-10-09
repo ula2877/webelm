@@ -3,11 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import Input, { Select, Textarea } from '../components/ui/Input';
+import Input, { Select } from '../components/ui/Input';
 import { cn } from '../utils/helpers';
 import * as projectService from '../services/projects';
 import {
-  PROJECT_JENIS,
   PROJECT_STATUS,
   PROJECT_URGENCY,
   buildProjectPayload,
@@ -16,24 +15,35 @@ import {
   validateProject,
 } from '../utils/projects';
 import { Section } from './CreateSuratQuotation';
+import ProjectUserSelect from '../components/ProjectUserSelect';
+import ProjectDescriptionEditor from '../components/ProjectDescriptionEditor';
 
 const CFG = {
   routeBase: 'projects',
-  label: 'Projek',
 };
 
-// Halaman Create/Edit Projek (data via API tb_project).
-// Satu component untuk create & edit, mengikuti pola halaman Create/Edit
-// Surat: header + tombol simpan kanan atas, form satu kolom penuh.
+/** Tampilkan digit sebagai "3.000.000" saat diketik; value tetap digit. */
+function formatHargaDisplay(value) {
+  const digits = String(value ?? '').replace(/\D/g, '').slice(0, 15);
+  if (!digits) return '';
+  return new Intl.NumberFormat('id-ID').format(Number(digits));
+}
+
+// Halaman Tambah/Edit Project (data via API tb_project).
+// Urutan field mengikuti referensi: Client, Judul, Deskripsi,
+// 3 tanggal, Worker, Harga/Urgency/Status.
 export default function CreateProjek() {
   const navigate = useNavigate();
-  const { id: editId } = useParams();
-  const isEditMode = Boolean(editId);
+  const { uuid } = useParams();
+  const isEditMode = Boolean(uuid);
 
   const [isLoadingDetail, setIsLoadingDetail] = useState(isEditMode);
   const [loadError, setLoadError] = useState(null);
-  const [form, setForm] = useState(emptyProjectForm);
-  const [clients, setClients] = useState([]);
+  const [form, setForm] = useState(() => ({
+    ...emptyProjectForm(),
+    status: 'running',
+  }));
+  const [originalForm, setOriginalForm] = useState(null);
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -42,38 +52,23 @@ export default function CreateProjek() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Opsi client (tb_user) untuk dropdown Customer. Diambil dari meta
-  // endpoint list yang sama - pola yang dipakai CreateUser untuk roles.
-  useEffect(() => {
-    let cancelled = false;
-    projectService
-      .fetchProjects({ perPage: 1 })
-      .then((res) => {
-        if (!cancelled && res?.status === 'ok' && Array.isArray(res.clients)) {
-          setClients(res.clients);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // ---- Mode EDIT: isi form dari GET /api/projects/{id} ----
+  // ---- Mode EDIT: isi form dari GET /api/projects/uuid/{uuid} ----
   useEffect(() => {
     if (!isEditMode) return;
     let cancelled = false;
     setIsLoadingDetail(true);
     setLoadError(null);
     projectService
-      .fetchProjectDetail(editId)
+      .fetchProjectDetailByUuid(uuid)
       .then((res) => {
         if (cancelled) return;
         if (res?.status !== 'ok' || !res.data) {
           setLoadError('Data projek tidak ditemukan.');
           return;
         }
-        setForm(formFromProjectDetail(res.data));
+        const formData = formFromProjectDetail(res.data);
+        setForm(formData);
+        setOriginalForm(formData);
       })
       .catch((err) => {
         if (!cancelled) setLoadError(err.message || 'Gagal memuat data projek.');
@@ -84,7 +79,18 @@ export default function CreateProjek() {
     return () => {
       cancelled = true;
     };
-  }, [isEditMode, editId]);
+  }, [isEditMode, uuid]);
+
+  // Reset ke data awal yang dimuat dari server (edit) atau kosong (create).
+  const handleReset = () => {
+    if (isEditMode && originalForm) {
+      setForm({ ...originalForm });
+    } else {
+      setForm({ ...emptyProjectForm(), status: 'running' });
+    }
+    setErrors({});
+    setNotice(null);
+  };
 
   const handleSubmit = async () => {
     const { valid, errors: validationErrors } = validateProject(form);
@@ -97,22 +103,32 @@ export default function CreateProjek() {
     try {
       const payload = buildProjectPayload(form);
       const res = isEditMode
-        ? await projectService.updateProject(editId, payload)
+        ? await projectService.updateProjectByUuid(uuid, payload)
         : await projectService.saveProject(payload);
       if (res?.status !== 'ok' || (!isEditMode && !res.data?.id)) {
         setNotice({ type: 'error', message: res?.message || 'Gagal menyimpan projek.' });
         return;
       }
-      navigate(`/${CFG.routeBase}`, {
-        state: {
-          notice: {
-            type: 'success',
-            message: isEditMode
-              ? 'Perubahan projek berhasil disimpan.'
-              : 'Projek berhasil disimpan.',
+      // Setelah edit berhasil, arahkan ke halaman View dengan UUID yang sama.
+      if (isEditMode) {
+        navigate(`/projects/${uuid}/view`, {
+          state: {
+            notice: {
+              type: 'success',
+              message: 'Perubahan projek berhasil disimpan.',
+            },
           },
-        },
-      });
+        });
+      } else {
+        navigate(`/${CFG.routeBase}`, {
+          state: {
+            notice: {
+              type: 'success',
+              message: 'Projek berhasil disimpan.',
+            },
+          },
+        });
+      }
     } catch (err) {
       // Tampilkan pesan validasi per-field dari Laravel (422) kalau ada.
       const fieldErrors = err?.errors
@@ -138,29 +154,39 @@ export default function CreateProjek() {
         <div className="flex items-start gap-3">
           <button
             type="button"
-            onClick={() => navigate(`/${CFG.routeBase}`)}
+            onClick={() => isEditMode ? navigate(`/projects/${uuid}/view`) : navigate(`/${CFG.routeBase}`)}
             className="mt-0.5 p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-gray-100 transition-colors"
             title="Kembali"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h2 className="page-title">
-              {isEditMode ? `Edit ${CFG.label}` : `Buat ${CFG.label}`}
-            </h2>
+            <h2 className="page-title">{isEditMode ? 'Edit Project' : 'Tambah Project'}</h2>
             <p className="page-subtitle">
-              {isEditMode ? 'Edit data projek' : 'Buat data projek baru'}
+              {isEditMode
+                ? 'Edit data project'
+                : 'Tambahkan project baru ke dalam sistem dengan informasi lengkap dan sesuai.'}
             </p>
           </div>
         </div>
         <div className="flex gap-3">
+          {isEditMode && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleReset}
+              className="whitespace-nowrap"
+            >
+              Reset
+            </Button>
+          )}
           <Button
             type="button"
             onClick={handleSubmit}
             loading={isSubmitting}
             className="whitespace-nowrap"
           >
-            {isEditMode ? 'Simpan Perubahan' : 'Simpan'}
+            {isEditMode ? 'Simpan Perubahan' : 'Simpan Project'}
           </Button>
         </div>
       </div>
@@ -203,88 +229,45 @@ export default function CreateProjek() {
       )}
 
       {(!isEditMode || (!isLoadingDetail && !loadError)) && (
-        <Card>
-          <Section title="Informasi Projek">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="Kode Projek"
-                value={form.code}
-                onChange={(e) => setField('code', e.target.value)}
-                error={errors.code}
-                placeholder="Masukkan kode projek"
-              />
-              <Input
-                label="Nama Projek"
-                value={form.name}
-                onChange={(e) => setField('name', e.target.value)}
-                error={errors.name}
-                placeholder="Masukkan nama projek"
-              />
-              <div className="sm:col-span-2">
-                <Select
-                  label="Customer / Instansi"
+        <div className="w-full max-w-full md:max-w-[90%] lg:max-w-[75%]">
+          <Section title="Informasi Proyek">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Client: searchable select dari tb_user level client. */}
+              <div className="sm:col-span-2 lg:col-span-3">
+                <ProjectUserSelect
+                  label="Client *"
+                  placeholder="Cari client..."
+                  levelNames="client"
                   value={form.id_client}
-                  onChange={(e) => setField('id_client', e.target.value)}
+                  onChange={(v) => setField('id_client', v)}
                   error={errors.id_client}
-                >
-                  <option value="">Pilih customer</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nama}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className="sm:col-span-2">
-                <Textarea
-                  label="Deskripsi Projek"
-                  rows={3}
-                  value={form.description}
-                  onChange={(e) => setField('description', e.target.value)}
-                  placeholder="Masukkan deskripsi projek"
                 />
               </div>
-              <div className="sm:col-span-2">
-                <span className="block text-sm font-medium text-text-primary mb-1.5">
-                  Worker (opsional)
-                </span>
-                <div className="rounded-lg border border-border bg-white px-3 py-2.5 max-h-48 overflow-y-auto">
-                  {clients.length === 0 ? (
-                    <p className="text-sm text-text-muted">Memuat daftar user...</p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                      {clients.map((c) => {
-                        const checked = (form.worker_ids || []).map(Number).includes(Number(c.id));
-                        return (
-                          <label
-                            key={c.id}
-                            className="flex items-center gap-2 text-sm text-text-primary cursor-pointer rounded px-1 py-1 hover:bg-gray-50"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(e) => {
-                                const ids = (form.worker_ids || []).map(Number);
-                                setField(
-                                  'worker_ids',
-                                  e.target.checked
-                                    ? [...ids, Number(c.id)]
-                                    : ids.filter((id) => Number(id) !== Number(c.id))
-                                );
-                              }}
-                              className="w-4 h-4 rounded accent-primary-600"
-                            />
-                            <span className="truncate">{c.nama}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-                <p className="mt-1.5 text-xs text-text-muted">
-                  Worker terpilih disimpan ke tb_tim (boleh kosong).
-                </p>
+
+              {/* Judul */}
+              <div className="sm:col-span-2 lg:col-span-3">
+                <Input
+                  label="Judul *"
+                  value={form.name}
+                  onChange={(e) => setField('name', e.target.value)}
+                  error={errors.name}
+                  placeholder="Masukkan judul project"
+                />
               </div>
+
+              {/* Deskripsi: WYSIWYG (HTML + upload gambar ke server). */}
+              <div className="sm:col-span-2 lg:col-span-3">
+                <ProjectDescriptionEditor
+                  value={form.description}
+                  onChange={(v) => setField('description', v)}
+                  error={errors.description}
+                  uploadingNotice={(msg) =>
+                    setNotice({ type: 'error', message: msg })
+                  }
+                />
+              </div>
+
+              {/* Tanggal: 3 kolom di desktop. */}
               <Input
                 label="Tanggal Mulai"
                 type="date"
@@ -293,7 +276,7 @@ export default function CreateProjek() {
                 error={errors.startDate}
               />
               <Input
-                label="Tanggal Estimasi"
+                label="Tanggal Estimasi Selesai"
                 type="date"
                 value={form.estimasiDate}
                 onChange={(e) => setField('estimasiDate', e.target.value)}
@@ -306,32 +289,31 @@ export default function CreateProjek() {
                 onChange={(e) => setField('endDate', e.target.value)}
                 error={errors.endDate}
               />
-              <Select
-                label="Jenis Projek"
-                value={form.jenis}
-                onChange={(e) => setField('jenis', e.target.value)}
-                error={errors.jenis}
-              >
-                <option value="">Pilih jenis</option>
-                {PROJECT_JENIS.map((j) => (
-                  <option key={j.value} value={j.value}>
-                    {j.label}
-                  </option>
-                ))}
-              </Select>
-              <Select
-                label="Status"
-                value={form.status}
-                onChange={(e) => setField('status', e.target.value)}
-                error={errors.status}
-              >
-                <option value="">Pilih status</option>
-                {PROJECT_STATUS.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </Select>
+
+              {/* Worker: searchable multiple select dari tb_user level worker. */}
+              <div className="sm:col-span-2 lg:col-span-3">
+                <ProjectUserSelect
+                  label="Worker"
+                  placeholder="Cari worker..."
+                  levelNames={['worker', 'worker pcb']}
+                  multiple
+                  value={form.worker_ids}
+                  onChange={(v) => setField('worker_ids', v)}
+                  error={errors.worker_ids}
+                />
+              </div>
+
+              {/* Harga / Urgency / Status: 3 kolom di desktop. */}
+              <Input
+                label="Harga"
+                inputMode="numeric"
+                value={formatHargaDisplay(form.harga)}
+                onChange={(e) =>
+                  setField('harga', String(e.target.value).replace(/\D/g, '').slice(0, 15))
+                }
+                error={errors.harga}
+                placeholder="Rp 0"
+              />
               <Select
                 label="Urgency"
                 value={form.urgency}
@@ -344,30 +326,21 @@ export default function CreateProjek() {
                   </option>
                 ))}
               </Select>
-              <Input
-                label="Harga"
-                type="number"
-                min="0"
-                step="1"
-                value={form.harga}
-                onChange={(e) => setField('harga', e.target.value)}
-                error={errors.harga}
-                placeholder="Masukkan harga"
-              />
-              <div className="sm:col-span-2">
-                <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!!form.is_proposed}
-                    onChange={(e) => setField('is_proposed', e.target.checked)}
-                    className="w-4 h-4 rounded accent-primary-600"
-                  />
-                  <span className="font-medium">Projek usulan (is_proposed)</span>
-                </label>
-              </div>
+              <Select
+                label="Status"
+                value={form.status}
+                onChange={(e) => setField('status', e.target.value)}
+                error={errors.status}
+              >
+                {PROJECT_STATUS.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </Select>
             </div>
           </Section>
-        </Card>
+        </div>
       )}
     </div>
   );

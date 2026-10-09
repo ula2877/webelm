@@ -4,7 +4,6 @@
 // Data lewat services/projects.js (tb_project). Nilai enum mengikuti
 // database apa adanya; label Indonesia hanya untuk tampilan:
 //   status: running/done/cancel -> Berjalan/Selesai/Dibatalkan
-//   jenis: pcb/project          -> PCB/Project
 //   urgency: urgent/normal/non-urgent
 //
 // Kode projek <-> uuid_project, nama <-> judul, customer <-> id_client
@@ -56,7 +55,6 @@ export const PROJECT_PELUNASAN_VARIANT = {
 };
 
 const STATUS_VALUES = PROJECT_STATUS.map((s) => s.value);
-const JENIS_VALUES = PROJECT_JENIS.map((s) => s.value);
 const URGENCY_VALUES = PROJECT_URGENCY.map((s) => s.value);
 
 export function projectStatusLabel(value) {
@@ -74,9 +72,8 @@ export function projectUrgencyLabel(value) {
 /** Validasi form create/edit (mirror aturan backend, pesan Indonesia). */
 export function validateProject(form) {
   const errors = {};
-  if (!String(form.code || '').trim()) {
-    errors.code = 'Kode projek wajib diisi.';
-  } else if (String(form.code).trim().length > 30) {
+  // Kode opsional di form (backend auto-generate bila kosong, max 30).
+  if (String(form.code || '').trim().length > 30) {
     errors.code = 'Kode projek maksimal 30 karakter.';
   }
   if (!String(form.name || '').trim()) errors.name = 'Nama projek wajib diisi.';
@@ -85,12 +82,12 @@ export function validateProject(form) {
   if (!String(form.estimasiDate || '').trim()) {
     errors.estimasiDate = 'Tanggal estimasi wajib diisi.';
   }
-  if (!String(form.endDate || '').trim()) {
-    errors.endDate = 'Tanggal selesai wajib diisi.';
-  } else if (form.startDate && String(form.endDate) < String(form.startDate)) {
-    errors.endDate = 'Tanggal selesai tidak boleh sebelum tanggal mulai.';
+  // Tanggal Selesai opsional: hanya divalidasi jika diisi.
+  if (String(form.endDate || '').trim()) {
+    if (form.startDate && String(form.endDate) < String(form.startDate)) {
+      errors.endDate = 'Tanggal selesai tidak boleh sebelum tanggal mulai.';
+    }
   }
-  if (!JENIS_VALUES.includes(form.jenis)) errors.jenis = 'Jenis projek wajib dipilih.';
   if (!STATUS_VALUES.includes(form.status)) errors.status = 'Status wajib dipilih.';
   if (!URGENCY_VALUES.includes(form.urgency)) errors.urgency = 'Urgency wajib dipilih.';
   if (form.harga !== '' && form.harga !== null && !(Number(form.harga) >= 0)) {
@@ -108,11 +105,9 @@ export function emptyProjectForm() {
     startDate: '',
     estimasiDate: '',
     endDate: '',
-    jenis: '',
     status: '',
     urgency: 'normal',
     harga: '',
-    is_proposed: false,
     // Daftar id tb_user worker (disimpan ke tb_tim, bukan tb_project).
     worker_ids: [],
   };
@@ -129,7 +124,6 @@ export function formFromProjectDetail(detail) {
     startDate: d.startDate || d.tanggal_mulai || '',
     estimasiDate: d.estimasiDate || d.tanggal_estimasi || '',
     endDate: d.endDate || d.tanggal_selesai || '',
-    jenis: d.jenis || '',
     status: d.status || '',
     urgency: d.urgency || 'normal',
     harga: d.harga ?? '',
@@ -146,7 +140,6 @@ export function buildProjectPayload(form) {
     uuid_project: String(form.code || '').trim() || null,
     id_client: Number(form.id_client) || null,
     judul: String(form.name || '').trim(),
-    jenis: form.jenis || null,
     deskripsi: String(form.description || ''),
     tanggal_mulai: form.startDate || null,
     tanggal_estimasi: form.estimasiDate || null,
@@ -154,7 +147,7 @@ export function buildProjectPayload(form) {
     status: form.status || null,
     urgency: form.urgency || 'normal',
     harga: form.harga === '' || form.harga === null ? 0 : Number(form.harga),
-    is_proposed: !!form.is_proposed,
+
     worker_ids: Array.isArray(form.worker_ids)
       ? form.worker_ids.map((id) => Number(id)).filter((n) => Number.isFinite(n))
       : [],

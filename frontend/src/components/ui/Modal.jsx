@@ -10,6 +10,8 @@ export default function Modal({
   children,
   size = 'md',
   showClose = true,
+  footer = null,
+  bodyClassName,
 }) {
   useEffect(() => {
     if (isOpen) {
@@ -39,6 +41,7 @@ export default function Modal({
     md: 'max-w-lg',
     lg: 'max-w-2xl',
     xl: 'max-w-4xl',
+    '2xl': 'max-w-3xl',
   };
 
   return createPortal(
@@ -49,12 +52,12 @@ export default function Modal({
       />
       <div
         className={cn(
-          'relative bg-card rounded-xl shadow-xl w-full animate-scale-in',
+          'relative bg-card rounded-xl shadow-xl w-full max-h-[90vh] flex flex-col animate-scale-in',
           sizes[size]
         )}
       >
         {title && (
-          <div className="flex items-center justify-between p-6 border-b border-border">
+          <div className="flex items-center justify-between p-6 border-b border-border shrink-0">
             <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
             {showClose && (
               <button
@@ -66,7 +69,14 @@ export default function Modal({
             )}
           </div>
         )}
-        <div className="p-6">{children}</div>
+        <div className={cn('p-6 overflow-y-auto flex-1', bodyClassName)}>
+          {children}
+        </div>
+        {footer && (
+          <div className="px-6 py-4 border-t border-border bg-white rounded-b-xl shrink-0">
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body
