@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import Card from '../components/ui/Card';
@@ -29,6 +29,25 @@ function formatHargaDisplay(value) {
   return new Intl.NumberFormat('id-ID').format(Number(digits));
 }
 
+/**
+ * Kumpulkan URL <img> dari HTML deskripsi. Dipakai untuk mendeteksi gambar
+ * yang hilang dari konten editor (dibandingkan saat simpan), bukan untuk
+ * menghapus per-event ketikan.
+ */
+function extractImageUrls(html) {
+  if (!html) return new Set();
+  try {
+    const doc = new DOMParser().parseFromString(String(html), 'text/html');
+    return new Set(
+      [...doc.querySelectorAll('img')]
+        .map((img) => img.getAttribute('src'))
+        .filter((src) => typeof src === 'string' && src.trim() !== '')
+    );
+  } catch {
+    return new Set();
+  }
+}
+
 // Halaman Tambah/Edit Project (data via API tb_project).
 // Urutan field mengikuti referensi: Client, Judul, Deskripsi,
 // 3 tanggal, Worker, Harga/Urgency/Status.
@@ -48,9 +67,50 @@ export default function CreateProjek() {
   const [notice, setNotice] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ---- Pelacakan gambar WYSIWYG (agar file tak terpakai bisa dibersihkan) ----
+  // uploadedImages: URL yang di-upload pada sesi ini.
+  // savedImages   : URL yang benar-benar tersimpan di server (baseline saat
+  //                 load, diperbarui tiap simpan sukses).
+  // deletedImages : URL yang sudah pernah dikirim untuk dihapus (anti dobel).
+  const uploadedImagesRef = useRef(new Set());
+  const savedImagesRef = useRef(new Set());
+  const deletedImagesRef = useRef(new Set());
+  const submittingRef = useRef(false);
+
   const setField = (name, value) => {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
+
+  // Kirim permintaan hapus hanya untuk URL yang belum pernah dikirim. Bila
+  // request gagal, URL dilepas kembali agar bisa dicoba lagi nanti. Tidak
+  // pernah melempar error ke UI: penghapusan bersifat best-effort.
+  const flushImageDeletions = useCallback((urls) => {
+    const targets = [...new Set(urls)].filter(
+      (u) => typeof u === 'string' && u !== '' && !deletedImagesRef.current.has(u)
+    );
+    if (targets.length === 0) return;
+    targets.forEach((u) => deletedImagesRef.current.add(u));
+    projectService.deleteDescriptionImages(targets).catch(() => {
+      targets.forEach((u) => deletedImagesRef.current.delete(u));
+    });
+  }, []);
+
+  // Saat halaman ditinggalkan (mis. batal edit / kembali), bersihkan gambar
+  // yang di-upload sesi ini tapi TIDAK pernah ikut tersimpan - jangan sentuh
+  // gambar yang masih menjadi bagian konten tersimpan. Dibungkam bila sedang
+  // submit agar tidak menghapus gambar yang justru sedang disimpan.
+  useEffect(
+    () => () => {
+      if (submittingRef.current) return;
+      const orphans = [...uploadedImagesRef.current].filter(
+        (u) => !savedImagesRef.current.has(u) && !deletedImagesRef.current.has(u)
+      );
+      if (orphans.length > 0) {
+        projectService.deleteDescriptionImages(orphans).catch(() => {});
+      }
+    },
+    []
+  );
 
   // ---- Mode EDIT: isi form dari GET /api/projects/uuid/{uuid} ----
   useEffect(() => {
@@ -69,6 +129,8 @@ export default function CreateProjek() {
         const formData = formFromProjectDetail(res.data);
         setForm(formData);
         setOriginalForm(formData);
+        // Baseline gambar tersimpan (untuk mendeteksi gambar yang dihapus).
+        savedImagesRef.current = extractImageUrls(formData.description);
       })
       .catch((err) => {
         if (!cancelled) setLoadError(err.message || 'Gagal memuat data projek.');
@@ -83,13 +145,24 @@ export default function CreateProjek() {
 
   // Reset ke data awal yang dimuat dari server (edit) atau kosong (create).
   const handleReset = () => {
-    if (isEditMode && originalForm) {
-      setForm({ ...originalForm });
-    } else {
-      setForm({ ...emptyProjectForm(), status: 'running' });
-    }
+    const nextForm =
+      isEditMode && originalForm
+        ? { ...originalForm }
+        : { ...emptyProjectForm(), status: 'running' };
+    setForm(nextForm);
     setErrors({});
     setNotice(null);
+    // Gambar yang di-upload sesi ini tapi tidak lagi ada di form (mis. form
+    // create direset) menjadi yatim -> bersihkan. Gambar tersimpan tidak
+    // disentuh.
+    const remaining = extractImageUrls(nextForm.description);
+    const orphans = [...uploadedImagesRef.current].filter(
+      (u) =>
+        !remaining.has(u) &&
+        !savedImagesRef.current.has(u) &&
+        !deletedImagesRef.current.has(u)
+    );
+    if (orphans.length > 0) flushImageDeletions(orphans);
   };
 
   const handleSubmit = async () => {
@@ -100,6 +173,7 @@ export default function CreateProjek() {
       return;
     }
     setIsSubmitting(true);
+    submittingRef.current = true;
     try {
       const payload = buildProjectPayload(form);
       const res = isEditMode
@@ -109,6 +183,18 @@ export default function CreateProjek() {
         setNotice({ type: 'error', message: res?.message || 'Gagal menyimpan projek.' });
         return;
       }
+
+      // Gambar yang hilang dari konten final (ada di baseline lama atau
+      // di-upload sesi ini, tapi tidak lagi di konten tersimpan) dikirim untuk
+      // dihapus. Backend tetap memverifikasi kepemilikan file & pemakaian
+      // bersama sebelum menghapus file fisik. Dijalankan SETELAH simpan sukses
+      // supaya gambar yang dibatalkan (undo) tetap aman.
+      const finalImages = extractImageUrls(res?.data?.description ?? payload.deskripsi);
+      const candidates = new Set([...savedImagesRef.current, ...uploadedImagesRef.current]);
+      finalImages.forEach((u) => candidates.delete(u));
+      savedImagesRef.current = finalImages;
+      flushImageDeletions([...candidates]);
+
       // Setelah edit berhasil, arahkan ke halaman View dengan UUID yang sama.
       if (isEditMode) {
         navigate(`/projects/${uuid}/view`, {
@@ -143,6 +229,7 @@ export default function CreateProjek() {
           : err.message || 'Gagal menyimpan projek.',
       });
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -264,6 +351,7 @@ export default function CreateProjek() {
                   uploadingNotice={(msg) =>
                     setNotice({ type: 'error', message: msg })
                   }
+                  onImageUploaded={(url) => uploadedImagesRef.current.add(url)}
                 />
               </div>
 

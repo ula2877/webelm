@@ -39,7 +39,7 @@ const DEFAULT_EDITOR_HEIGHT = 200;
 // heading 1-3, bullet/numbered list, alignment, link, image
 // (toolbar + paste + drag-and-drop).
 // Fitur: resize vertikal dengan handle di bagian bawah editor.
-export default function ProjectDescriptionEditor({ value, onChange, error, uploadingNotice }) {
+export default function ProjectDescriptionEditor({ value, onChange, error, uploadingNotice, onImageUploaded }) {
   const [uploading, setUploading] = useState(false);
   const [editorHeight, setEditorHeight] = useState(DEFAULT_EDITOR_HEIGHT); // Tinggi awal nyaman (px)
   const [isResizing, setIsResizing] = useState(false);
@@ -52,8 +52,12 @@ export default function ProjectDescriptionEditor({ value, onChange, error, uploa
   const onChangeRef = useRef(onChange);
   const uploadRef = useRef(null);
   const editorRef = useRef(null);
+  // Callback URL gambar ter-upload (dipakai halaman untuk melacak gambar
+  // sesi ini sehingga bisa dibersihkan bila tidak jadi disimpan).
+  const onImageUploadedRef = useRef(onImageUploaded);
   useEffect(() => {
     onChangeRef.current = onChange;
+    onImageUploadedRef.current = onImageUploaded;
   });
 
   const uploadAndInsert = useCallback(
@@ -69,6 +73,8 @@ export default function ProjectDescriptionEditor({ value, onChange, error, uploa
           .focus()
           .setImage({ src: url })
           .run();
+        // Beri tahu halaman bahwa URL ini di-upload pada sesi ini.
+        onImageUploadedRef.current?.(url);
         return true;
       } catch (err) {
         uploadingNotice?.(err.message || 'Gagal mengunggah gambar.');

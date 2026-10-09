@@ -7,6 +7,7 @@ import {
   Loader2,
   Paperclip,
   Plus,
+  Trash2,
   TrendingUp,
   UploadCloud,
   X,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import Card, { CardTitle } from './ui/Card';
 import Button from './ui/Button';
+import ConfirmDialog from './ui/ConfirmDialog';
 import EmptyState from './ui/EmptyState';
 import Modal from './ui/Modal';
 import ProgressBar from './ui/ProgressBar';
@@ -134,6 +136,11 @@ export default function ProjectProgress({ uuid }) {
 
   const [busyAttachmentId, setBusyAttachmentId] = useState(null);
   const [preview, setPreview] = useState(null);
+
+  // Hapus progress: item yang dipilih + status request (single-flight).
+  const [confirmTarget, setConfirmTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const deletingRef = useRef(false);
 
   // Preview lokal file yang belum diunggah (untuk revoke object URL saat lepas).
   useEffect(() => {
@@ -381,6 +388,47 @@ export default function ProjectProgress({ uuid }) {
     }
   };
 
+  // Konfirmasi hapus SATU progress. UI tidak diubah sebelum backend sukses.
+  const handleDelete = async () => {
+    if (!confirmTarget || deletingRef.current) return;
+
+    deletingRef.current = true;
+    setIsDeleting(true);
+    try {
+      const response = await projectService.deleteProjectProgress(
+        uuid,
+        confirmTarget.id
+      );
+
+      // Progress sudah terhapus di backend -> aman memperbarui daftar & bar.
+      const filesFailed = Array.isArray(response?.data?.files_failed)
+        ? response.data.files_failed
+        : [];
+
+      setConfirmTarget(null);
+      await loadProgress();
+      setNotice({
+        // File fisik yang gagal dibersihkan dilaporkan eksplisit, tidak disembunyikan.
+        type: filesFailed.length > 0 ? 'error' : 'success',
+        message:
+          response?.message ||
+          (filesFailed.length > 0
+            ? 'Progress dihapus, tetapi sebagian file gagal dibersihkan dari storage.'
+            : 'Progress berhasil dihapus.'),
+      });
+    } catch (err) {
+      // Gagal: JANGAN hapus item dari UI, tampilkan pesan error.
+      setNotice({
+        type: 'error',
+        message: err.message || 'Gagal menghapus progress.',
+      });
+      setConfirmTarget(null);
+    } finally {
+      deletingRef.current = false;
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <>
       <Card>
@@ -479,9 +527,21 @@ export default function ProjectProgress({ uuid }) {
                             <span className="text-sm font-semibold text-primary-600 tabular-nums">
                               {value}%
                             </span>
-                            <span className="text-xs text-text-muted">
-                              {formatTanggal(item.created_at)}
-                            </span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-text-muted">
+                                {formatTanggal(item.created_at)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmTarget(item)}
+                                disabled={isDeleting}
+                                title="Hapus progress"
+                                aria-label="Hapus progress"
+                                className="p-1 rounded-lg text-text-muted hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                           <ProgressBar value={value} className="mb-2" />
                           <p className="text-sm text-text-secondary whitespace-pre-line break-words">
@@ -788,6 +848,20 @@ export default function ProjectProgress({ uuid }) {
           )}
         </div>
       </Modal>
+
+      {/* Konfirmasi hapus progress (progress + file terkait) */}
+      <ConfirmDialog
+        isOpen={Boolean(confirmTarget)}
+        onClose={() => {
+          if (!isDeleting) setConfirmTarget(null);
+        }}
+        onConfirm={handleDelete}
+        title="Hapus Progress"
+        message="Apakah kamu yakin ingin menghapus progress ini? Data progress beserta file yang terkait akan dihapus secara permanen."
+        confirmLabel="Hapus"
+        cancelLabel="Batal"
+        loading={isDeleting}
+      />
     </>
   );
 }

@@ -100,6 +100,9 @@ Route::middleware('auth')->group(function () {
     // Projects - CRUD penuh atas tb_project existing (tanpa migration).
     // Upload gambar deskripsi (file-only, tanpa record database).
     Route::post('/projects/description-image', [ProjectController::class, 'descriptionImage']);
+    // Hapus gambar deskripsi yang sudah tidak dipakai (validasi backend +
+    // cek pemakaian bersama sebelum file fisik dihapus).
+    Route::post('/projects/description-image/delete', [ProjectController::class, 'deleteDescriptionImage']);
     Route::get('/projects', [ProjectController::class, 'index']);
     Route::post('/projects', [ProjectController::class, 'store']);
     // UUID route must come before {id} route to avoid conflicts
@@ -126,6 +129,9 @@ Route::middleware('auth')->group(function () {
         ->where('uuid', '[a-zA-Z0-9\-]+');
     Route::post('/projects/uuid/{uuid}/progress', [ProjectController::class, 'addProgress'])
         ->where('uuid', '[a-zA-Z0-9\-]+');
+    Route::delete('/projects/uuid/{uuid}/progress/{progressId}', [ProjectController::class, 'deleteProgress'])
+        ->where('uuid', '[a-zA-Z0-9\-]+')
+        ->where('progressId', '[0-9]+');
 
     Route::get('/projects/{id}', [ProjectController::class, 'show'])
         ->where('id', '[0-9]+');

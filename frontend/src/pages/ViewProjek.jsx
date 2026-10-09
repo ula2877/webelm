@@ -247,7 +247,14 @@ export default function ViewProjek() {
   const clientObj = project.client && typeof project.client === 'object' ? project.client : null;
   const clientName = getStringValue(clientObj?.nama, getStringValue(project.client, '-'));
   const clientPhotoUrl = getPhotoUrl(clientObj);
-  const clientId = project.id_client;
+
+  // Subtitle customer: alamat + no_hp dari tb_user. Hanya tampilkan informasi
+  // yang tersedia - jangan pernah menampilkan nilai palsu bila salah satu kosong.
+  // Nilai non-string (null/objek) diabaikan agar tidak memicu error React.
+  const clientSubtitle = [clientObj?.alamat, clientObj?.no_hp]
+    .map((v) => (typeof v === 'string' || typeof v === 'number' ? String(v).trim() : ''))
+    .filter((v) => v !== '')
+    .join(' · ');
 
   // Extract workers safely
   const workers = Array.isArray(project.workers) ? project.workers : [];
@@ -373,9 +380,9 @@ export default function ViewProjek() {
                 <div className="flex items-center gap-4">
                   {renderAvatar({ name: clientName, photoUrl: clientPhotoUrl, size: 'w-16 h-16', textSize: 'text-2xl' })}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-text-primary truncate">{clientName}</p>
-                    {clientId && (
-                      <p className="text-xs text-text-muted">ID Customer: {clientId}</p>
+                    <p className="text-sm font-semibold text-text-primary break-words">{clientName}</p>
+                    {clientSubtitle && (
+                      <p className="text-xs text-text-muted mt-0.5 break-words">{clientSubtitle}</p>
                     )}
                   </div>
                 </div>
@@ -397,14 +404,14 @@ export default function ViewProjek() {
                 Tim Project
               </p>
               {workers.length > 0 ? (
-                <div className="space-y-3">
-                  {workers.map((worker) => {
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {workers.map((worker, index) => {
                     const workerName = getStringValue(worker?.nama);
                     const workerPhotoUrl = getPhotoUrl(worker);
-                    const workerId = getStringValue(worker?.id);
+                    const workerKey = worker?.id ?? workerName ?? index;
                     return (
                       <div
-                        key={workerId}
+                        key={workerKey}
                         className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-gray-50/50 transition-colors"
                       >
                         {renderAvatar({
@@ -413,10 +420,9 @@ export default function ViewProjek() {
                           size: 'w-10 h-10',
                           textSize: 'text-lg',
                         })}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-text-primary truncate">{workerName}</p>
-                          <p className="text-xs text-text-muted">ID Worker: {workerId}</p>
-                        </div>
+                        <p className="text-sm font-medium text-text-primary min-w-0 break-words">
+                          {workerName}
+                        </p>
                       </div>
                     );
                   })}

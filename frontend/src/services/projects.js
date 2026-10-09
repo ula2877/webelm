@@ -53,6 +53,15 @@ export async function uploadDescriptionImage(file) {
   return response.data;
 }
 
+// Hapus gambar deskripsi yang sudah tidak dipakai lagi. Backend memvalidasi
+// URL (host + folder aplikasi, anti traversal) dan menolak menghapus file
+// yang masih direferensikan project lain. Aman dipanggil dengan URL lama
+// (gambar eksternal/legacy akan di-skip, bukan dihapus).
+export async function deleteDescriptionImages(urls) {
+  const response = await api.post('/api/projects/description-image/delete', { urls });
+  return response.data;
+}
+
 // File Manager - Project Files (tb_files via UUID)
 
 // Get list of files for a project
@@ -112,5 +121,16 @@ export async function saveProjectProgress(
       }
     },
   });
+  return response.data;
+}
+
+// Hapus SATU catatan progress beserta lampirannya. Backend memvalidasi bahwa
+// progress milik projek (via uuid), menghapus record tb_progress + tb_files,
+// lalu menghapus file fisik yang TIDAK lagi dipakai progress lain. Respons
+// memuat deleted_files/kept_files/files_failed.
+export async function deleteProjectProgress(uuid, progressId) {
+  const response = await api.delete(
+    `/api/projects/uuid/${uuid}/progress/${progressId}`
+  );
   return response.data;
 }

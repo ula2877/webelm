@@ -321,7 +321,7 @@ class ProjectController extends Controller
 
         $file = $request->file('file');
         $disk = Storage::disk('public');
-        $directory = 'project-description';
+        $directory = $this->descriptionImageDirectory();
 
         // Extension comes from the server-detected mime, never the client name.
         $extension = strtolower($file->guessExtension() ?: 'png');
@@ -355,6 +355,187 @@ class ProjectController extends Controller
                 'url' => $disk->url($relativePath),
             ],
         ], 201);
+    }
+
+    /**
+     * POST /api/projects/description-image/delete
+     * JSON: { urls: string[] }
+     *
+     * Menghapus file gambar WYSIWYG yang SUDAH TIDAK dipakai lagi. Tidak ada
+     * tabel metadata: satu-satunya "record" adalah URL <img> di dalam
+     * tb_project.deskripsi, jadi keamanan bergantung pada dua hal:
+     *
+     *   1) URL divalidasi ketat (host harus host aplikasi, path harus berada
+     *      di folder storage/app/public/project-description, tanpa traversal)
+     *      -> tidak ada penghapusan file arbitrer.
+     *   2) File hanya dihapus bila TIDAK ada satu pun baris tb_project yang
+     *      masih mereferensikan nama file tersebut -> gambar yang dipakai
+     *      bersama project lain tidak ikut terhapus.
+     *
+     * Idempotent & aman diulang: URL yang sudah tidak ada dianggap sukses.
+     */
+    public function deleteDescriptionImage(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'urls' => ['required', 'array', 'max:50'],
+            'urls.*' => ['string', 'max:1000'],
+        ], [
+            'urls.required' => 'Daftar gambar yang akan dihapus wajib diisi.',
+            'urls.array' => 'Daftar gambar tidak valid.',
+            'urls.max' => 'Terlalu banyak gambar dalam satu permintaan.',
+            'urls.*.string' => 'URL gambar tidak valid.',
+            'urls.*.max' => 'URL gambar terlalu panjang.',
+        ]);
+
+        $disk = Storage::disk('public');
+        $directory = $this->descriptionImageDirectory();
+
+        $deleted = [];
+        $skipped = [];
+        $failed = [];
+
+        foreach (array_values(array_unique($validated['urls'])) as $url) {
+            $filename = $this->resolveDescriptionImageFilename((string) $url, $directory);
+
+            // Bukan file milik aplikasi (domain lain / folder lain / traversal):
+            // jangan sentuh filesystem lokal.
+            if ($filename === null) {
+                $skipped[] = ['url' => $url, 'reason' => 'not_app_owned'];
+                continue;
+            }
+
+            // Masih direferensikan project (ini atau project lain) -> jangan hapus.
+            if ($this->descriptionImageInUse($filename)) {
+                $skipped[] = ['url' => $url, 'reason' => 'in_use'];
+                continue;
+            }
+
+            $relativePath = $directory . '/' . $filename;
+
+            try {
+                if ($disk->exists($relativePath) && !$disk->delete($relativePath)) {
+                    $failed[] = ['url' => $url, 'reason' => 'delete_failed'];
+                    continue;
+                }
+            } catch (\Throwable $e) {
+                // Jangan pernah bocorkan detail driver ke browser.
+                $failed[] = ['url' => $url, 'reason' => 'delete_failed'];
+                continue;
+            }
+
+            $deleted[] = $url;
+        }
+
+        if (!empty($failed)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Sebagian gambar gagal dihapus.',
+                'data' => [
+                    'deleted' => $deleted,
+                    'skipped' => $skipped,
+                    'failed' => $failed,
+                ],
+            ], 500);
+        }
+
+        return response()->json([
+            'status' => 'ok',
+            'message' => 'Penghapusan gambar selesai.',
+            'data' => [
+                'deleted' => $deleted,
+                'skipped' => $skipped,
+                'failed' => $failed,
+            ],
+        ], 200);
+    }
+
+    /** Folder gambar deskripsi WYSIWYG di dalam disk `public`. */
+    private function descriptionImageDirectory(): string
+    {
+        return 'project-description';
+    }
+
+    /**
+     * Ubah URL gambar deskripsi menjadi nama file yang aman pada folder yang
+     * diizinkan. Mengembalikan null bila URL bukan milik aplikasi ini.
+     *
+     * Aturan:
+     *  - host (bila ada) harus sama dengan host storage aplikasi;
+     *  - path harus mengandung "/<storage-prefix>/project-description/";
+     *  - hanya SATU segmen nama file setelah folder (tanpa "/" tambahan);
+     *  - nama file hanya [A-Za-z0-9._-] dengan ekstensi gambar yang didukung.
+     */
+    private function resolveDescriptionImageFilename(string $url, string $directory): ?string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return null;
+        }
+
+        $parts = parse_url($url);
+        if ($parts === false) {
+            return null;
+        }
+
+        $diskUrl = Storage::disk('public')->url('');
+        $expected = parse_url($diskUrl) ?: [];
+        $expectedHost = $expected['host'] ?? null;
+        $expectedPort = $expected['port']
+            ?? ((($expected['scheme'] ?? '') === 'https') ? 443 : 80);
+        $host = $parts['host'] ?? null;
+
+        // URL eksternal (atau host/port tak terverifikasi) tidak pernah menjadi
+        // dasar penghapusan file lokal.
+        if ($host !== null) {
+            $port = $parts['port']
+                ?? ((($parts['scheme'] ?? '') === 'https') ? 443 : 80);
+            if ($expectedHost === null
+                || strcasecmp($host, $expectedHost) !== 0
+                || $port !== $expectedPort) {
+                return null;
+            }
+        }
+
+        $prefix = trim((string) parse_url($diskUrl, PHP_URL_PATH), '/');
+        if ($prefix === '') {
+            $prefix = 'storage';
+        }
+
+        $needle = '/' . $prefix . '/' . $directory . '/';
+        $path = (string) ($parts['path'] ?? '');
+        $pos = strpos($path, $needle);
+        if ($pos === false) {
+            return null;
+        }
+
+        $rest = substr($path, $pos + strlen($needle));
+        if ($rest === '' || str_contains($rest, '/')) {
+            return null;
+        }
+
+        if (!preg_match('/^[A-Za-z0-9._-]+$/', $rest)) {
+            return null;
+        }
+
+        if (!preg_match('/\.(jpg|jpeg|png|webp)$/i', $rest)) {
+            return null;
+        }
+
+        return $rest;
+    }
+
+    /**
+     * Apakah nama file masih direferensikan oleh deskripsi project mana pun.
+     * Pencarian LIKE di-escape agar karakter `_` pada nama file tidak menjadi
+     * wildcard.
+     */
+    private function descriptionImageInUse(string $filename): bool
+    {
+        $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $filename);
+
+        return DB::table('tb_project')
+            ->where('deskripsi', 'like', '%' . $escaped . '%')
+            ->exists();
     }
 
     /**
@@ -858,6 +1039,169 @@ class ProjectController extends Controller
     }
 
     /**
+     * DELETE /api/projects/uuid/{uuid}/progress/{progressId}
+     *
+     * Hapus SATU catatan tb_progress beserta lampirannya. Selalu di-resolve
+     * dari uuid_project + id_project di URL, jadi progress projek lain tidak
+     * pernah bisa dihapus lewat projek ini (anti-IDOR).
+     *
+     * Strategi konsistensi (filesystem tidak ikut rollback transaksi):
+     *   - Record progress & record tb_files dihapus di dalam SATU transaksi DB.
+     *   - File fisik dihapus SETELAH commit. Urutan ini memastikan DB tidak
+     *     pernah menunjuk file yang sudah hilang; kegagalan hapus fisik hanya
+     *     menyisakan file yatim (dilaporkan, bukan disembunyikan), bukan
+     *     lampiran yang rusak.
+     *   - File yang masih direferensikan progress LAIN (projek sama / berbeda)
+     *     tidak dihapus record maupun fisiknya - hanya dilepas dari progress
+     *     yang dihapus.
+     *   - File dengan id_parent projek lain tidak pernah disentuh.
+     */
+    public function deleteProgress(string $uuid, int $progressId): JsonResponse
+    {
+        $project = Project::where('uuid_project', $uuid)->first();
+
+        if (!$project) {
+            return $this->notFound();
+        }
+
+        $projectId = (int) $project->id_project;
+
+        // 1-2. Progress harus ada DAN milik projek ini.
+        $progress = DB::table('tb_progress')
+            ->where('id', $progressId)
+            ->where('id_project', $projectId)
+            ->first();
+
+        if (!$progress) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Progress tidak ditemukan.',
+            ], 404);
+        }
+
+        // 3-4. Parse kolom id_file (JSON array; toleran nilai lama) -> ID file.
+        $fileIds = $this->parseFileIds($progress->id_file ?? null);
+
+        // 5-6. Ambil HANYA record file yang benar-benar milik projek ini.
+        $ownedFiles = [];
+        if (!empty($fileIds)) {
+            $ownedFiles = DB::table('tb_files')
+                ->whereIn('id', $fileIds)
+                ->where('id_parent', $projectId)
+                ->get()
+                ->keyBy('id')
+                ->all();
+        }
+
+        // 5b. File yang masih dipakai progress lain tidak boleh dihapus.
+        $referencedElsewhere = $this->fileIdsReferencedByOtherProgress($progressId);
+
+        $deletableFiles = [];
+        $keptFiles = [];
+        foreach ($ownedFiles as $fileId => $file) {
+            $fileId = (int) $fileId;
+            if (isset($referencedElsewhere[$fileId])) {
+                // Hanya lepas referensi (progress dihapus), record & file tetap.
+                $keptFiles[] = $fileId;
+                continue;
+            }
+            $deletableFiles[] = $file;
+        }
+
+        // 7-8. Hapus record progress + record file dalam satu transaksi.
+        try {
+            DB::beginTransaction();
+
+            DB::table('tb_progress')->where('id', $progressId)->delete();
+
+            $deletableIds = array_map(fn ($file) => (int) $file->id, $deletableFiles);
+            if (!empty($deletableIds)) {
+                DB::table('tb_files')->whereIn('id', $deletableIds)->delete();
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+
+            return $this->writeFailed('Gagal menghapus progress.');
+        }
+
+        // 9. Baru setelah commit: hapus file fisik (best-effort + dilaporkan).
+        //    Path dipetakan lewat resolveStoredPath() sehingga tetap di dalam
+        //    direktori yang diizinkan (anti traversal / path sembarang).
+        $disk = Storage::disk(config('elmech.project_file.disk', 'public'));
+        $filesDeleted = [];
+        $filesFailed = [];
+
+        foreach ($deletableFiles as $file) {
+            $fileId = (int) $file->id;
+
+            try {
+                $relativePath = $this->resolveStoredPath((string) $file->path);
+
+                // Path tak terpetakan / file sudah tidak ada = aman (record
+                // sudah terhapus, tidak ada lagi yang perlu dibersihkan).
+                if ($relativePath === null || !$disk->exists($relativePath)) {
+                    continue;
+                }
+
+                if (!$disk->delete($relativePath)) {
+                    $filesFailed[] = ['id' => $fileId, 'reason' => 'delete_failed'];
+                    continue;
+                }
+
+                $filesDeleted[] = $fileId;
+            } catch (\Throwable $e) {
+                $filesFailed[] = ['id' => $fileId, 'reason' => 'delete_failed'];
+            }
+        }
+
+        $message = 'Progress berhasil dihapus.';
+        if (!empty($filesFailed)) {
+            // Jangan diam-diam menganggap sukses penuh: laporkan file yatim.
+            $message = 'Progress berhasil dihapus, tetapi sebagian file gagal dibersihkan dari storage.';
+        }
+
+        return response()->json([
+            'status' => 'ok',
+            'message' => $message,
+            'data' => [
+                'id' => (int) $progressId,
+                'deleted_files' => $filesDeleted,
+                'kept_files' => $keptFiles,
+                'files_failed' => $filesFailed,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Kumpulkan ID file yang masih direferensikan progress SELAIN
+     * $excludeProgressId (projek sama maupun berbeda). Dipakai sebelum
+     * menghapus record/file agar lampiran yang dipakai bersama tidak ikut
+     * terhapus.
+     *
+     * @return array<int,bool>
+     */
+    private function fileIdsReferencedByOtherProgress(int $excludeProgressId): array
+    {
+        $referenced = [];
+
+        $rows = DB::table('tb_progress')
+            ->where('id', '!=', $excludeProgressId)
+            ->pluck('id_file');
+
+        foreach ($rows as $value) {
+            foreach ($this->parseFileIds($value) as $id) {
+                $referenced[$id] = true;
+            }
+        }
+
+        return $referenced;
+    }
+
+    /**
      * Ubah satu row tb_progress (+ lampirannya) menjadi payload API.
      *
      * Lampiran diambil dari tb_files berdasarkan ID di kolom id_file, tetapi
@@ -1296,6 +1640,10 @@ class ProjectController extends Controller
                 'nama' => $project->client->nama,
                 'foto' => $project->client->foto,
                 'foto_url' => $project->client->fotoUrl(),
+                // Kontak customer langsung dari tb_user; null bila kosong
+                // (tidak pernah difabrikasi di sisi API).
+                'alamat' => $project->client->alamat,
+                'no_hp' => $project->client->no_hp,
             ];
         }
 
