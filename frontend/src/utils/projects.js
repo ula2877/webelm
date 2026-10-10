@@ -48,6 +48,15 @@ export const PROJECT_PELUNASAN = [
   { value: 'lunas', label: 'Lunas' },
 ];
 
+// Opsi FILTER Pelunasan pada halaman daftar Projek. Hanya dua kategori,
+// mengikuti tb_pembayaran (relasi id_project):
+//   lunas       = punya minimal satu transaksi 'lunas'
+//   belum_lunas = tidak punya transaksi 'lunas' (termasuk tanpa transaksi / DP saja)
+export const PROJECT_PELUNASAN_FILTER = [
+  { value: 'lunas', label: 'Lunas' },
+  { value: 'belum_lunas', label: 'Belum Lunas' },
+];
+
 export const PROJECT_PELUNASAN_VARIANT = {
   belum_bayar: 'default',
   dp: 'warning',

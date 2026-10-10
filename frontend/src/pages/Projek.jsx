@@ -10,7 +10,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
 import * as projectService from '../services/projects';
 import { rupiah } from '../utils/suratJenis';
 import {
-  PROJECT_PELUNASAN,
+  PROJECT_PELUNASAN_FILTER,
   PROJECT_PELUNASAN_VARIANT,
   PROJECT_STATUS,
   PROJECT_STATUS_VARIANT,
@@ -214,7 +214,7 @@ export default function Projek() {
               className="w-full sm:w-44 rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
               <option value="">Semua Pelunasan</option>
-              {PROJECT_PELUNASAN.map((o) => (
+              {PROJECT_PELUNASAN_FILTER.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>

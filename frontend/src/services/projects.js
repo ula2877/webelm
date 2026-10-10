@@ -134,3 +134,36 @@ export async function deleteProjectProgress(uuid, progressId) {
   );
   return response.data;
 }
+
+// Project Payment (tb_pembayaran via UUID). Backend menghitung ringkasan
+// (harga/total/sisa) dari data aktual; frontend tidak pernah mengirim
+// id_project maupun total.
+export async function fetchProjectPayments(uuid) {
+  const response = await api.get(`/api/projects/uuid/${uuid}/pembayaran`);
+  return response.data;
+}
+
+// Tambah transaksi pembayaran + bukti transfer (opsional). bukti berupa File.
+export async function saveProjectPayment(uuid, { pelunasan, nominal, bukti } = {}) {
+  const formData = new FormData();
+  formData.append('pelunasan', pelunasan);
+  formData.append('nominal', nominal);
+  if (bukti) formData.append('bukti', bukti);
+
+  const response = await api.post(
+    `/api/projects/uuid/${uuid}/pembayaran`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  return response.data;
+}
+
+// Hapus SATU transaksi pembayaran beserta file buktinya (bila file tersebut
+// tidak dipakai data lain). Backend memvalidasi kepemilikan transaksi lewat
+// uuid projek; respons memuat `data.summary` terbaru + status file.
+export async function deleteProjectPayment(uuid, paymentId) {
+  const response = await api.delete(
+    `/api/projects/uuid/${uuid}/pembayaran/${paymentId}`
+  );
+  return response.data;
+}

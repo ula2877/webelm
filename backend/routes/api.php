@@ -133,6 +133,16 @@ Route::middleware('auth')->group(function () {
         ->where('uuid', '[a-zA-Z0-9\-]+')
         ->where('progressId', '[0-9]+');
 
+    // Project Payment - tb_pembayaran via UUID. id_project selalu di-resolve
+    // dari uuid_project; nominal/jenis divalidasi ulang di backend.
+    Route::get('/projects/uuid/{uuid}/pembayaran', [ProjectController::class, 'getPembayaran'])
+        ->where('uuid', '[a-zA-Z0-9\-]+');
+    Route::post('/projects/uuid/{uuid}/pembayaran', [ProjectController::class, 'addPembayaran'])
+        ->where('uuid', '[a-zA-Z0-9\-]+');
+    Route::delete('/projects/uuid/{uuid}/pembayaran/{paymentId}', [ProjectController::class, 'deletePembayaran'])
+        ->where('uuid', '[a-zA-Z0-9\-]+')
+        ->where('paymentId', '[0-9]+');
+
     Route::get('/projects/{id}', [ProjectController::class, 'show'])
         ->where('id', '[0-9]+');
     Route::put('/projects/{id}', [ProjectController::class, 'update'])

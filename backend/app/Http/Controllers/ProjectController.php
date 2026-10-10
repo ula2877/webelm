@@ -106,25 +106,24 @@ class ProjectController extends Controller
             $query->where('urgency', $urgency);
         }
 
-        // Filter pelunasan memakai logika yang sama dengan present():
-        // lunas = minimal satu baris 'lunas'; dp = ada 'dp' tanpa 'lunas';
-        // belum_bayar = tanpa baris pembayaran sama sekali.
-        // whereHas/whereDoesntHave = subquery EXISTS: satu project tidak
-        // pernah ganda walau punya banyak baris tb_pembayaran.
+        // Filter pelunasan (kategori pada halaman daftar Projek):
+        //   lunas       = projek punya minimal satu transaksi 'lunas'.
+        //   belum_lunas = projek TIDAK punya transaksi 'lunas' sama sekali
+        //                 (termasuk projek tanpa pembayaran / hanya 'dp').
+        // Pemeriksaan berlaku atas SELURUH baris tb_pembayaran projek, dan
+        // whereHas/whereDoesntHave = subquery EXISTS sehingga satu projek
+        // tidak pernah tampil ganda walau punya banyak transaksi.
         $pelunasan = $request->query('pelunasan');
         if ($pelunasan !== null && $pelunasan !== '' && $pelunasan !== 'all') {
-            if (!in_array($pelunasan, ['lunas', 'dp', 'belum_bayar'], true)) {
+            if (!in_array($pelunasan, ['lunas', 'belum_lunas'], true)) {
                 throw ValidationException::withMessages([
                     'pelunasan' => ['Filter pelunasan tidak valid.'],
                 ]);
             }
             if ($pelunasan === 'lunas') {
                 $query->whereHas('pembayaran', fn ($q) => $q->where('pelunasan', 'lunas'));
-            } elseif ($pelunasan === 'dp') {
-                $query->whereHas('pembayaran', fn ($q) => $q->where('pelunasan', 'dp'))
-                    ->whereDoesntHave('pembayaran', fn ($q) => $q->where('pelunasan', 'lunas'));
             } else {
-                $query->whereDoesntHave('pembayaran');
+                $query->whereDoesntHave('pembayaran', fn ($q) => $q->where('pelunasan', 'lunas'));
             }
         }
 
@@ -1235,6 +1234,396 @@ class ProjectController extends Controller
             'created_at' => $row->created_at,
             'files' => $attachments,
         ];
+    }
+
+    /**
+     * GET /api/projects/uuid/{uuid}/pembayaran
+     *
+     * Ringkasan keuangan + seluruh riwayat transaksi tb_pembayaran milik satu
+     * projek. Projek selalu di-resolve dari uuid_project; id_project tidak
+     * pernah diterima dari client.
+     *
+     * Catatan: tb_pembayaran hanya punya 5 kolom (id_pembayaran, id_project,
+     * nominal, bukti_tf, pelunasan) - TIDAK ada kolom tanggal. Riwayat karena
+     * itu diurutkan dari id terbesar (transaksi terbaru lebih dulu) dan tidak
+     * ada tanggal yang difabrikasi.
+     */
+    public function getPembayaran(string $uuid): JsonResponse
+    {
+        $project = Project::where('uuid_project', $uuid)->first();
+
+        if (!$project) {
+            return $this->notFound();
+        }
+
+        $disk = Storage::disk(config('elmech.project_file.disk', 'public'));
+
+        return response()->json([
+            'status' => 'ok',
+            'data' => $this->presentPembayaran($project, $disk),
+        ], 200);
+    }
+
+    /**
+     * POST /api/projects/uuid/{uuid}/pembayaran
+     *
+     * Tambah satu transaksi pembayaran (dp/lunas) + bukti transfer opsional.
+     *
+     * Aturan:
+     *  - nominal integer > 0, maksimum sesuai int(11).
+     *  - 'lunas' HANYA boleh bila nominal TEPAT sama dengan sisa biaya
+     *    (harga - total pembayaran existing); ini yang membuat pilihan 'lunas'
+     *    benar-benar berarti projek lunas. Validasi final dijalankan di dalam
+     *    transaksi dengan mengunci baris projek supaya dua request bersamaan
+     *    tidak menghasilkan nilai yang tidak konsisten.
+     *  - Bukti transfer (jpg/jpeg/png/pdf) ditulis lebih dulu; bila INSERT
+     *    gagal, file baru dibersihkan agar tidak menjadi yatim.
+     */
+    public function addPembayaran(Request $request, string $uuid): JsonResponse
+    {
+        $project = Project::where('uuid_project', $uuid)->first();
+
+        if (!$project) {
+            return $this->notFound();
+        }
+
+        $config = config('elmech.project_payment');
+        $allowedMimes = $config['mimes'] ?? ['jpg', 'jpeg', 'png', 'pdf'];
+        $maxKb = (int) ($config['max_kb'] ?? 4096);
+        $diskName = $config['disk'] ?? 'public';
+        $directory = trim($config['directory'] ?? 'project-files', '/');
+
+        $validated = $request->validate([
+            'pelunasan' => ['required', Rule::in(['dp', 'lunas'])],
+            'nominal' => ['required', 'integer', 'min:1', 'max:2000000000'],
+            'bukti' => ['nullable', 'file', 'max:' . $maxKb],
+        ], [
+            'pelunasan.required' => 'Jenis pembayaran wajib dipilih.',
+            'pelunasan.in' => 'Jenis pembayaran harus DP atau Lunas.',
+            'nominal.required' => 'Nominal pembayaran wajib diisi.',
+            'nominal.integer' => 'Nominal pembayaran harus berupa angka bulat.',
+            'nominal.min' => 'Nominal pembayaran harus lebih besar dari nol.',
+            'nominal.max' => 'Nominal pembayaran terlalu besar.',
+            'bukti.file' => 'Bukti transfer tidak valid.',
+            'bukti.max' => 'Ukuran bukti transfer maksimal ' . ($maxKb / 1024) . ' MB.',
+        ]);
+
+        $jenis = $validated['pelunasan'];
+        $nominal = (int) $validated['nominal'];
+
+        // Validasi tipe bukti berbasis MIME asli (bukan nama file) sebelum
+        // menulis apa pun ke disk.
+        $file = $request->file('bukti');
+        if ($file) {
+            if (!$file->isValid()) {
+                throw ValidationException::withMessages([
+                    'bukti' => ['Bukti transfer gagal diunggah.'],
+                ]);
+            }
+
+            $extension = strtolower($file->guessExtension() ?: '');
+            if ($extension === '' || !in_array($extension, $allowedMimes, true)) {
+                throw ValidationException::withMessages([
+                    'bukti' => [
+                        'Format bukti transfer tidak diizinkan. Format yang diperbolehkan: JPG, JPEG, PNG, PDF.',
+                    ],
+                ]);
+            }
+        }
+
+        $disk = Storage::disk($diskName);
+        $writtenPaths = [];
+
+        try {
+            DB::beginTransaction();
+
+            // Kunci baris projek: serialisasi penambahan pembayaran per projek
+            // sehingga sisa biaya selalu dihitung dari data terbaru.
+            DB::table('tb_project')
+                ->where('id_project', $project->id_project)
+                ->lockForUpdate()
+                ->first();
+
+            $harga = (int) $project->harga;
+            $total = (int) DB::table('tb_pembayaran')
+                ->where('id_project', $project->id_project)
+                ->sum('nominal');
+            $sisa = max(0, $harga - $total);
+
+            if ($jenis === 'lunas' && $nominal !== $sisa) {
+                throw ValidationException::withMessages([
+                    'nominal' => [
+                        $nominal > $sisa
+                            ? 'Nominal Lunas tidak boleh melebihi sisa biaya (Rp ' . number_format($sisa, 0, ',', '.') . ').'
+                            : 'Nominal Lunas harus sama dengan sisa biaya (Rp ' . number_format($sisa, 0, ',', '.') . ').',
+                    ],
+                ]);
+            }
+
+            // Simpan bukti transfer (opsional). Yang disimpan adalah URL, bukan
+            // binary, dan file fisik memakai mekanisme project-file yang sudah
+            // ada (tb_files tidak disentuh - bukti_tf kolom sendiri).
+            $buktiUrl = '';
+            if ($file) {
+                $extension = strtolower($file->guessExtension() ?: 'bin');
+                $filename = $this->randomFileName($extension);
+                $relativePath = $directory . '/' . $filename;
+
+                $stream = fopen($file->getRealPath(), 'rb');
+                $stored = $stream !== false && $disk->put($relativePath, $stream);
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
+                if (!$stored) {
+                    throw new \RuntimeException('Gagal menyimpan bukti transfer.');
+                }
+
+                $writtenPaths[] = $relativePath;
+                $buktiUrl = $this->publicFileUrl($filename);
+            }
+
+            DB::table('tb_pembayaran')->insert([
+                'id_project' => $project->id_project,
+                'nominal' => $nominal,
+                'bukti_tf' => $buktiUrl,
+                'pelunasan' => $jenis,
+            ]);
+
+            DB::commit();
+        } catch (ValidationException $e) {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+            $this->cleanupFiles($disk, $writtenPaths);
+
+            throw $e;
+        } catch (\Throwable $e) {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+            $this->cleanupFiles($disk, $writtenPaths);
+
+            return $this->writeFailed('Gagal menyimpan pembayaran.');
+        }
+
+        return response()->json([
+            'status' => 'ok',
+            'message' => 'Pembayaran berhasil disimpan.',
+            'data' => $this->presentPembayaran($project, $disk),
+        ], 201);
+    }
+
+    /**
+     * Ringkasan pembayaran + riwayat satu projek (dipakai GET & respons POST).
+     * Semua angka dihitung dari baris tb_pembayaran yang sebenarnya; tidak ada
+     * state frontend yang dipercaya dan tidak ada kolom status tambahan.
+     */
+    private function presentPembayaran(Project $project, $disk): array
+    {
+        $harga = (int) $project->harga;
+
+        // Transaksi terbaru lebih dulu: tb_pembayaran tidak menyimpan tanggal,
+        // jadi id_pembayaran (auto increment) menjadi urutan yang deterministik.
+        $rows = DB::table('tb_pembayaran')
+            ->where('id_project', $project->id_project)
+            ->orderByDesc('id_pembayaran')
+            ->get();
+
+        $total = 0;
+        $lunasCount = 0;
+        $dpCount = 0;
+        $pembayaran = [];
+
+        foreach ($rows as $row) {
+            $nominal = (int) $row->nominal;
+            $total += $nominal;
+
+            if ($row->pelunasan === 'lunas') {
+                $lunasCount++;
+            } elseif ($row->pelunasan === 'dp') {
+                $dpCount++;
+            }
+
+            $pembayaran[] = [
+                'id' => (int) $row->id_pembayaran,
+                'nominal' => $nominal,
+                'bukti_tf' => (string) $row->bukti_tf,
+                'bukti_url' => $this->fileUrlOnDisk($disk, $row->bukti_tf),
+                'pelunasan' => $row->pelunasan,
+            ];
+        }
+
+        return [
+            'harga' => $harga,
+            'total_pembayaran' => $total,
+            'sisa' => max(0, $harga - $total),
+            'kelebihan' => max(0, $total - $harga),
+            'pelunasan' => $this->resolvePelunasan($lunasCount, $dpCount),
+            'pembayaran' => $pembayaran,
+            // tb_pembayaran tidak punya kolom tanggal: jangan mengarang.
+            'has_transaction_date' => false,
+        ];
+    }
+
+    /**
+     * DELETE /api/projects/uuid/{uuid}/pembayaran/{paymentId}
+     *
+     * Hapus SATU transaksi tb_pembayaran milik projek yang sedang dibuka,
+     * beserta file bukti transfernya bila file itu eksklusif (tidak dipakai
+     * transaksi lain / fitur lain).
+     *
+     * Urutan aman:
+     *   1-3. Transaksi harus ada DAN id_project-nya cocok dengan projek dari
+     *        uuid di URL. id_project dari client tidak pernah dipercaya.
+     *   4.   Rencanakan nasib file SEBELUM menghapus apa pun (read-only check):
+     *        tak ada bukti / tak terpetakan (di luar storage) / dipakai data
+     *        lain / sudah hilang / boleh dihapus.
+     *   5.   Hapus record di dalam transaksi DB (file tidak disentuh lebih dulu,
+     *        sehingga DB tidak pernah menunjuk file yang sudah terhapus).
+     *   6.   Setelah commit, baru hapus file fisik (best-effort + dilaporkan).
+     */
+    public function deletePembayaran(string $uuid, int $paymentId): JsonResponse
+    {
+        $project = Project::where('uuid_project', $uuid)->first();
+
+        if (!$project) {
+            return $this->notFound();
+        }
+
+        $projectId = (int) $project->id_project;
+
+        // 1-3. Transaksi harus ada dan benar-benar milik projek ini. Baris milik
+        //      projek lain menghasilkan 404 dan tidak tersentuh.
+        $payment = DB::table('tb_pembayaran')
+            ->where('id_pembayaran', $paymentId)
+            ->where('id_project', $projectId)
+            ->first();
+
+        if (!$payment) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Pembayaran tidak ditemukan.',
+            ], 404);
+        }
+
+        $disk = Storage::disk(config('elmech.project_file.disk', 'public'));
+        $bukti = trim((string) ($payment->bukti_tf ?? ''));
+
+        // 4. Rencana file dihitung sebelum record dihapus.
+        $filePlan = 'none';       // tidak ada bukti transfer
+        $relativePath = null;
+
+        if ($bukti !== '') {
+            $relativePath = $this->resolveStoredPath($bukti);
+
+            if ($relativePath === null) {
+                // URL/format di luar storage aplikasi -> jangan pernah sentuh.
+                $filePlan = 'unmappable';
+            } elseif ($this->proofPathReferencedElsewhere($bukti, $paymentId)) {
+                // Masih dipakai transaksi lain / fitur lain -> simpan filenya.
+                $filePlan = 'kept';
+            } elseif (!$disk->exists($relativePath)) {
+                // File sudah tidak ada -> tidak ada yang perlu dibersihkan.
+                $filePlan = 'missing';
+            } else {
+                $filePlan = 'delete';
+            }
+        }
+
+        // 5. Hapus record dulu, di dalam transaksi.
+        try {
+            DB::beginTransaction();
+            DB::table('tb_pembayaran')->where('id_pembayaran', $paymentId)->delete();
+            DB::commit();
+        } catch (\Throwable $e) {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+
+            return $this->writeFailed('Gagal menghapus pembayaran.');
+        }
+
+        // 6. Setelah commit: hapus file fisik (anti path traversal lewat
+        //    resolveStoredPath; hanya direktori storage aplikasi).
+        $fileDeleted = false;
+        $fileFailed = false;
+
+        if ($filePlan === 'delete' && $relativePath !== null) {
+            try {
+                if ($disk->delete($relativePath)) {
+                    $fileDeleted = true;
+                } else {
+                    $fileFailed = true;
+                }
+            } catch (\Throwable $e) {
+                $fileFailed = true;
+            }
+        }
+
+        $message = 'Pembayaran berhasil dihapus.';
+        if ($fileFailed) {
+            // Jangan melaporkan sukses penuh: file bukti masih tertinggal dan
+            // perlu dibersihkan (dilaporkan eksplisit ke frontend).
+            $message = 'Pembayaran berhasil dihapus, tetapi file bukti transfer gagal dibersihkan dari storage.';
+        }
+
+        return response()->json([
+            'status' => 'ok',
+            'message' => $message,
+            'data' => [
+                'id' => $paymentId,
+                'file_deleted' => $fileDeleted,
+                'file_referenced' => $filePlan === 'kept',
+                'file_failed' => $fileFailed,
+                // Ringkasan terbaru agar frontend tidak perlu reload manual.
+                'summary' => $this->presentPembayaran($project, $disk),
+            ],
+        ], 200);
+    }
+
+    /**
+     * Apakah file bukti ($stored) masih direferensikan data LAIN.
+     *
+     * Dicek ke:
+     *   - baris tb_pembayaran lain (URL sama), dan
+     *   - tb_files (file projek / lampiran progress) yang menunjuk file fisik
+     *     yang sama (dibandingkan dari nama file),
+     * sehingga file yang dipakai bersama tidak ikut terhapus.
+     *
+     * File yang tidak bisa dipetakan ke storage dianggap "terpakai" supaya
+     * tidak pernah dihapus.
+     */
+    private function proofPathReferencedElsewhere(string $stored, int $excludePaymentId): bool
+    {
+        $value = trim($stored);
+        if ($value === '') {
+            return false;
+        }
+
+        $usedByPayment = DB::table('tb_pembayaran')
+            ->where('id_pembayaran', '!=', $excludePaymentId)
+            ->where('bukti_tf', $value)
+            ->exists();
+
+        if ($usedByPayment) {
+            return true;
+        }
+
+        $relative = $this->resolveStoredPath($value);
+        if ($relative === null) {
+            return true;
+        }
+
+        $name = basename($relative);
+        if ($name === '') {
+            return false;
+        }
+
+        // Nama file fisik unik (hex acak) sehingga LIKE '%<nama>%' aman dan
+        // tetap menangkap path lama/absolut. Wildcard di-escape.
+        $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $name);
+
+        return DB::table('tb_files')->where('path', 'like', '%' . $escaped . '%')->exists();
     }
 
     /**

@@ -17,6 +17,7 @@ import {
 import { Section } from './CreateSuratQuotation';
 import ProjectUserSelect from '../components/ProjectUserSelect';
 import ProjectDescriptionEditor from '../components/ProjectDescriptionEditor';
+import ProjectPaymentManager from '../components/ProjectPaymentManager';
 
 const CFG = {
   routeBase: 'projects',
@@ -316,7 +317,14 @@ export default function CreateProjek() {
       )}
 
       {(!isEditMode || (!isLoadingDetail && !loadError)) && (
-        <div className="w-full max-w-full md:max-w-[90%] lg:max-w-[75%]">
+        <div
+          className={cn(
+            isEditMode
+              ? 'grid grid-cols-1 lg:grid-cols-3 gap-6 items-start'
+              : 'w-full max-w-full md:max-w-[90%] lg:max-w-[75%]'
+          )}
+        >
+          <div className={cn(isEditMode && 'lg:col-span-2')}>
           <Section title="Informasi Proyek">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Client: searchable select dari tb_user level client. */}
@@ -428,6 +436,13 @@ export default function CreateProjek() {
               </Select>
             </div>
           </Section>
+          </div>
+
+          {isEditMode && (
+            <div className="lg:col-span-1">
+              <ProjectPaymentManager uuid={uuid} />
+            </div>
+          )}
         </div>
       )}
     </div>

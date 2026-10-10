@@ -176,4 +176,29 @@ return [
         'max_files' => 10,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Project Payment Proof (tb_pembayaran.bukti_tf)
+    |--------------------------------------------------------------------------
+    |
+    | Bukti transfer disimpan sebagai file pada disk `public` di folder yang
+    | SAMA dengan file projek ("project-files") dan dilayani melalui route
+    | GET /files/{filename}. URL lengkap ditulis ke tb_pembayaran.bukti_tf
+    | (varchar(100)); domain berasal dari elmech.project_file_url.base_url
+    | (default APP_URL) sehingga tidak ada domain produksi yang di-hardcode.
+    |
+    */
+    'project_payment' => [
+
+        'disk' => 'public',
+
+        'directory' => 'project-files',
+
+        // Format bukti transfer yang diterima.
+        'mimes' => ['jpg', 'jpeg', 'png', 'pdf'],
+
+        // Ukuran maksimum bukti transfer dalam kilobytes.
+        'max_kb' => 4096, // 4 MB
+    ],
+
 ];
