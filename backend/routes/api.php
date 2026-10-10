@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
@@ -28,6 +29,10 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,
 Route::middleware('auth')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    // Dashboard - statistik projek & pendapatan bulanan (read-only, tanpa
+    // perubahan schema). Agregasi dilakukan di backend agar ringan di frontend.
+    Route::get('/dashboard', [DashboardController::class, 'index']);
 
     // Profile - operates on the authenticated user's existing tb_user row.
     Route::post('/profile', [ProfileController::class, 'update']);

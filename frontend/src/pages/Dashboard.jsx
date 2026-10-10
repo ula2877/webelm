@@ -1,101 +1,265 @@
-import { Users, CreditCard, FileText, AlertTriangle, CheckCircle, Settings, UserPlus, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  FolderKanban,
+  Wallet,
+  BadgeCheck,
+  CheckCircle2,
+  Clock,
+  Info,
+} from 'lucide-react';
 import Card, { CardHeader, CardTitle } from '../components/ui/Card';
-import StatCard from '../components/ui/StatCard';
-import Badge from '../components/ui/Badge';
-import RevenueChart from '../components/charts/RevenueChart';
-import PerformanceChart from '../components/charts/PerformanceChart';
-import CategoryChart from '../components/charts/CategoryChart';
-import { statsData, recentActivity } from '../data/dummyData';
+import ErrorState from '../components/ui/ErrorState';
+import { PageLoading } from '../components/ui/LoadingSpinner';
+import ProjectCountChart from '../components/charts/ProjectCountChart';
+import IncomeChart from '../components/charts/IncomeChart';
+import PelunasanChart from '../components/charts/PelunasanChart';
+import { fetchDashboard } from '../services/dashboard';
+import { rupiah } from '../utils/suratJenis';
 
-const activityIcons = {
-  user: UserPlus,
-  transaction: CreditCard,
-  report: FileText,
-  system: Settings,
-  alert: AlertTriangle,
-};
+const MONTH_NAMES = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+];
 
-const activityColors = {
-  success: 'bg-emerald-50 text-emerald-600',
-  info: 'bg-blue-50 text-blue-600',
-  warning: 'bg-amber-50 text-amber-600',
-  error: 'bg-red-50 text-red-600',
-};
+const selectClass =
+  'w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500';
+
+/** Satu baris angka di dalam card KPI. */
+function StatLine({ label, value, tone = 'text-text-primary', icon: Icon }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="flex items-center gap-2 text-sm text-text-secondary">
+        {Icon && <Icon className="w-4 h-4" />}
+        {label}
+      </span>
+      <span className={`text-lg font-bold ${tone}`}>{value}</span>
+    </div>
+  );
+}
 
 export default function Dashboard() {
+  const [initialPeriod] = useState(() => {
+    const d = new Date();
+    return { month: d.getMonth() + 1, year: d.getFullYear() };
+  });
+  const [month, setMonth] = useState(initialPeriod.month);
+  const [year, setYear] = useState(initialPeriod.year);
+  const [data, setData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setIsLoading(true);
+    setError('');
+
+    fetchDashboard({ month, year, range: 6 })
+      .then((res) => {
+        if (!active) return;
+        if (res?.status === 'ok') {
+          setData(res.data);
+        } else {
+          setError('Gagal memuat data dashboard.');
+        }
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(
+          err?.response?.data?.message || err?.message || 'Gagal memuat data dashboard.'
+        );
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [month, year, reloadKey]);
+
+  const period = data?.period;
+  const projects = data?.projects;
+  const income = data?.income;
+  const pelunasan = data?.pelunasan;
+  const series = data?.series || [];
+  const highlightKey = `${year}-${String(month).padStart(2, '0')}`;
+
+  const yearOptions = useMemo(() => {
+    if (data?.available_years?.length) return data.available_years;
+    return Array.from({ length: 6 }, (_, i) => initialPeriod.year - i);
+  }, [data?.available_years, initialPeriod.year]);
+
+  const isEmpty =
+    !isLoading &&
+    !error &&
+    projects &&
+    projects.done + projects.running + projects.cancel === 0 &&
+    (income?.total_pembayaran ?? 0) === 0 &&
+    (pelunasan?.total ?? 0) === 0;
+
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Welcome section */}
-      <div>
-        <h2 className="page-title">Welcome back, Admin</h2>
-        <p className="page-subtitle">Here&apos;s what&apos;s happening today.</p>
-      </div>
-
-      {/* Stats cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {statsData.map((stat, index) => (
-          <StatCard
-            key={stat.id}
-            {...stat}
-            className={`stagger-${index + 1} animate-fade-in`}
-          />
-        ))}
-      </div>
-
-      {/* Charts row */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Card className="xl:col-span-2">
-          <CardHeader>
-            <CardTitle>Revenue Overview</CardTitle>
-            <Badge variant="success" dot>Live</Badge>
-          </CardHeader>
-          <RevenueChart />
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Category Distribution</CardTitle>
-          </CardHeader>
-          <CategoryChart />
-        </Card>
-      </div>
-
-      {/* Performance and Activity */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Card className="xl:col-span-2">
-          <CardHeader>
-            <CardTitle>Device Performance</CardTitle>
-            <Badge variant="info" dot>Real-time</Badge>
-          </CardHeader>
-          <PerformanceChart />
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <button className="text-sm text-primary-600 hover:text-primary-700 font-medium">
-              View all
-            </button>
-          </CardHeader>
-          <div className="space-y-4">
-            {recentActivity.slice(0, 5).map((activity) => {
-              const Icon = activityIcons[activity.type] || CheckCircle;
-              return (
-                <div key={activity.id} className="flex gap-3">
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${activityColors[activity.status]}`}>
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text-primary">{activity.title}</p>
-                    <p className="text-xs text-text-secondary truncate">{activity.description}</p>
-                    <p className="text-xs text-text-muted mt-1">{activity.time}</p>
-                  </div>
-                </div>
-              );
-            })}
+      {/* Header + pemilih periode */}
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div>
+          <h2 className="page-title">Dashboard</h2>
+          <p className="page-subtitle">
+            Ringkasan projek &amp; pendapatan ELMECH
+            {period?.label ? ` — ${period.label}` : ''}
+          </p>
+        </div>
+        <div className="flex items-end gap-3">
+          <div>
+            <label htmlFor="dash-month" className="block text-xs font-medium text-text-secondary mb-1">
+              Bulan
+            </label>
+            <select
+              id="dash-month"
+              aria-label="Pilih bulan"
+              value={month}
+              onChange={(e) => setMonth(Number(e.target.value))}
+              className={selectClass}
+            >
+              {MONTH_NAMES.map((name, index) => (
+                <option key={name} value={index + 1}>
+                  {name}
+                </option>
+              ))}
+            </select>
           </div>
-        </Card>
+          <div>
+            <label htmlFor="dash-year" className="block text-xs font-medium text-text-secondary mb-1">
+              Tahun
+            </label>
+            <select
+              id="dash-year"
+              aria-label="Pilih tahun"
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+              className={selectClass}
+            >
+              {yearOptions.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
+
+      {isLoading && <PageLoading />}
+
+      {!isLoading && error && (
+        <ErrorState
+          title="Gagal memuat dashboard"
+          description={error}
+          onRetry={() => setReloadKey((k) => k + 1)}
+        />
+      )}
+
+      {!isLoading && !error && data && (
+        <>
+          {isEmpty && (
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm text-text-secondary">
+              <Info className="w-4 h-4 flex-shrink-0 text-primary-600" />
+              Belum ada projek maupun pembayaran pada periode {period?.label}.
+            </div>
+          )}
+
+          {/* KPI */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <Card className="space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="w-9 h-9 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center">
+                  <FolderKanban className="w-5 h-5" />
+                </span>
+                <h3 className="text-base font-semibold text-text-primary">Projek Dikerjakan</h3>
+              </div>
+              <div className="space-y-3">
+                <StatLine label="Done" value={projects.done} tone="text-emerald-600" icon={CheckCircle2} />
+                <StatLine label="Running" value={projects.running} tone="text-blue-600" icon={Clock} />
+                <StatLine label="Total Dikerjakan" value={projects.total} />
+              </div>
+              {projects.cancel > 0 && (
+                <p className="text-xs text-text-muted">
+                  {projects.cancel} projek dibatalkan (cancel) tidak dihitung.
+                </p>
+              )}
+            </Card>
+
+            <Card className="space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Wallet className="w-5 h-5" />
+                </span>
+                <h3 className="text-base font-semibold text-text-primary">Income Projek</h3>
+              </div>
+              <div>
+                <p className="text-sm text-text-secondary">Total Pembayaran Diterima</p>
+                <p className="mt-1 text-2xl font-bold text-text-primary">
+                  {rupiah(income.total_pembayaran)}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-text-secondary">Total Nilai Projek Running</p>
+                <p className="mt-1 text-lg font-semibold text-blue-600">
+                  {rupiah(income.total_nilai_running)}
+                </p>
+              </div>
+              {income.payment_date_available === false && (
+                <p className="text-xs text-text-muted">
+                  Pembayaran dikaitkan ke bulan tanggal mulai projek terkait (data
+                  pembayaran tidak menyimpan tanggal transaksi).
+                </p>
+              )}
+            </Card>
+
+            <Card className="space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="w-9 h-9 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <BadgeCheck className="w-5 h-5" />
+                </span>
+                <h3 className="text-base font-semibold text-text-primary">Ringkasan Pelunasan</h3>
+              </div>
+              <div className="space-y-3">
+                <StatLine label="Lunas" value={pelunasan.lunas} tone="text-emerald-600" />
+                <StatLine label="Belum Lunas" value={pelunasan.belum_lunas} tone="text-amber-600" />
+              </div>
+              <p className="text-xs text-text-muted">
+                Lunas = punya transaksi pelunasan &lsquo;lunas&rsquo;; Belum Lunas termasuk DP
+                atau belum ada pembayaran.
+              </p>
+            </Card>
+          </div>
+
+          {/* Chart projek + pelunasan */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <Card className="xl:col-span-2">
+              <CardHeader>
+                <CardTitle>Tren Projek (6 Bulan Terakhir)</CardTitle>
+              </CardHeader>
+              <ProjectCountChart data={series} />
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Pelunasan</CardTitle>
+              </CardHeader>
+              <PelunasanChart lunas={pelunasan.lunas} belumLunas={pelunasan.belum_lunas} />
+            </Card>
+          </div>
+
+          {/* Chart pendapatan */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Pendapatan Bulanan (6 Bulan Terakhir)</CardTitle>
+            </CardHeader>
+            <IncomeChart data={series} highlightKey={highlightKey} />
+          </Card>
+        </>
+      )}
     </div>
   );
 }
