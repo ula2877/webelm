@@ -62,10 +62,17 @@ class DashboardApiTest extends TestCase
         return 'DSH' . bin2hex(random_bytes(6));
     }
 
-    /** Insert satu tb_project; tanggal_mulai dibentuk dari month + day. */
-    private function createProject(string $status, int $harga, int $month, int $day = 5, string $urgency = 'normal'): int
-    {
+    /** Insert satu tb_project; tanggal_mulai dibentuk dari year + month + day. */
+    private function createProject(
+        string $status,
+        int $harga,
+        int $month,
+        int $day = 5,
+        string $urgency = 'normal',
+        ?int $year = null
+    ): int {
         $uuid = 'DS' . substr(bin2hex(random_bytes(12)), 0, 24);
+        $year = $year ?? self::YEAR;
 
         $id = (int) DB::table('tb_project')->insertGetId([
             'uuid_project' => $uuid,
@@ -73,9 +80,9 @@ class DashboardApiTest extends TestCase
             'judul' => $this->marker() . ' ' . $uuid,
             'jenis' => 'project',
             'deskripsi' => 'dashboard test',
-            'tanggal_mulai' => sprintf('%04d-%02d-%02d', self::YEAR, $month, $day),
-            'tanggal_estimasi' => sprintf('%04d-%02d-%02d', self::YEAR, $month, min(28, $day + 1)),
-            'tanggal_selesai' => sprintf('%04d-%02d-%02d', self::YEAR, $month, min(28, $day + 2)),
+            'tanggal_mulai' => sprintf('%04d-%02d-%02d', $year, $month, $day),
+            'tanggal_estimasi' => sprintf('%04d-%02d-%02d', $year, $month, min(28, $day + 1)),
+            'tanggal_selesai' => sprintf('%04d-%02d-%02d', $year, $month, min(28, $day + 2)),
             'status' => $status,
             'urgency' => $urgency,
             'harga' => $harga,
@@ -254,6 +261,123 @@ class DashboardApiTest extends TestCase
         $this->assertSame(1, (int) $res->json('data.pelunasan.belum_lunas'));
 
         echo "\n[TEST] projek tanpa pembayaran = belum lunas, income 0 OK\n";
+    }
+
+    /** Baseline rekap bulan tertentu (dari data nyata) untuk perbandingan delta. */
+    private function recapBaseline(string $key): array
+    {
+        return [
+            'projects' => (int) DB::table('tb_project')
+                ->whereRaw("DATE_FORMAT(tanggal_mulai, '%Y-%m') = ?", [$key])
+                ->count(),
+            'income' => (int) DB::table('tb_pembayaran as b')
+                ->join('tb_project as p', 'p.id_project', '=', 'b.id_project')
+                ->whereRaw("DATE_FORMAT(p.tanggal_mulai, '%Y-%m') = ?", [$key])
+                ->sum('b.nominal'),
+        ];
+    }
+
+    private function recapRowFor(string $key): ?array
+    {
+        $rows = $this->getJson('/api/dashboard')->assertStatus(200)->json('data.monthly_recap');
+        foreach ($rows as $row) {
+            if ($row['key'] === $key) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    public function test_monthly_recap_has_twelve_months_and_newest_first()
+    {
+        $recap = $this->getJson('/api/dashboard')->assertStatus(200)->json('data.monthly_recap');
+
+        $this->assertIsArray($recap);
+        $this->assertCount(12, $recap);
+
+        $now = now();
+        $this->assertSame($now->format('Y-m'), $recap[0]['key']);
+        $this->assertSame($now->copy()->subMonthsNoOverflow(11)->format('Y-m'), $recap[11]['key']);
+
+        // Urut terbaru -> terlama.
+        $keys = array_column($recap, 'key');
+        $descending = $keys;
+        rsort($descending);
+        $this->assertSame($descending, $keys);
+
+        // Label contoh "Oktober 2026".
+        $this->assertMatchesRegularExpression('/^[A-Z][a-z]+ \d{4}$/', $recap[0]['label']);
+
+        echo "\n[TEST] rekap 12 bulan, urut terbaru -> terlama OK\n";
+    }
+
+    public function test_monthly_recap_counts_projects_once_and_sums_income_once()
+    {
+        $now = now();
+        $year = (int) $now->year;
+        $month = (int) $now->month;
+        $key = $now->format('Y-m');
+
+        $baseline = $this->recapBaseline($key);
+
+        // 3 projek; p1 punya 3 transaksi pembayaran, p2 punya 1, p3 tanpa.
+        $p1 = $this->createProject('running', 5000000, $month, 3, 'normal', $year);
+        $this->addPayment($p1, 'dp', 1000000);
+        $this->addPayment($p1, 'lunas', 2000000);
+        $this->addPayment($p1, 'lunas', 500000);
+
+        $p2 = $this->createProject('done', 4000000, $month, 4, 'normal', $year);
+        $this->addPayment($p2, 'lunas', 3000000);
+
+        $p3 = $this->createProject('cancel', 1000000, $month, 5, 'normal', $year);
+
+        $row = $this->recapRowFor($key);
+        $this->assertNotNull($row);
+
+        // 3 projek dihitung sekali (multi-transaksi p1 tidak menggandakan).
+        $this->assertSame($baseline['projects'] + 3, $row['project_count']);
+        // Income 1.000.000 + 2.000.000 + 500.000 + 3.000.000 = 6.500.000 sekali.
+        $this->assertSame($baseline['income'] + 6500000, $row['income']);
+
+        echo "\n[TEST] rekap: jumlah projek & income tidak duplikat OK\n";
+    }
+
+    public function test_monthly_recap_project_without_payment_adds_zero_income()
+    {
+        $now = now();
+        $year = (int) $now->year;
+        $month = (int) $now->month;
+        $key = $now->format('Y-m');
+
+        $baseline = $this->recapBaseline($key);
+
+        $this->createProject('running', 2000000, $month, 6, 'normal', $year);
+
+        $row = $this->recapRowFor($key);
+        $this->assertNotNull($row);
+        $this->assertSame($baseline['projects'] + 1, $row['project_count']);
+        // Tanpa transaksi -> income tidak bertambah (0 delta).
+        $this->assertSame($baseline['income'], $row['income']);
+
+        echo "\n[TEST] rekap: projek tanpa pembayaran -> income 0 OK\n";
+    }
+
+    public function test_monthly_recap_is_independent_of_selected_period()
+    {
+        $withPastPeriod = $this->getJson('/api/dashboard?month=1&year=' . self::YEAR)
+            ->assertStatus(200)->json('data.monthly_recap');
+        $withCurrentPeriod = $this->getJson('/api/dashboard')
+            ->assertStatus(200)->json('data.monthly_recap');
+
+        // Rekap 12 bulan terakhir tetap sama walau selector periode berbeda.
+        $this->assertSame(array_column($withPastPeriod, 'key'), array_column($withCurrentPeriod, 'key'));
+        $this->assertCount(12, $withPastPeriod);
+
+        // Bulan yang dipilih (Januari 2049) di luar jendela rekap -> tidak diubah.
+        $this->assertNull(collect($withPastPeriod)->firstWhere('key', '2049-01'));
+
+        echo "\n[TEST] rekap independen dari periode terpilih OK\n";
     }
 
     public function test_invalid_month_year_and_range_are_rejected()

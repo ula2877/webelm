@@ -8,6 +8,8 @@ import EmptyState from '../components/ui/EmptyState';
 import ProjectFileManager from '../components/ProjectFileManager';
 import ProjectProgress from '../components/ProjectProgress';
 import * as projectService from '../services/projects';
+import { useAuth } from '../context/AuthContext';
+import { isAdmin } from '../utils/roles';
 import { rupiah } from '../utils/quotation';
 import {
   PROJECT_STATUS,
@@ -45,6 +47,10 @@ function ensureSafeLinkHook() {
 export default function ViewProjek() {
   const navigate = useNavigate();
   const { uuid } = useParams();
+  const { user } = useAuth();
+  // Tombol Edit hanya untuk admin; worker yang ditugaskan hanya melihat detail
+  // dan dapat mengelola progress. Backend tetap menolak update dengan 403.
+  const canManage = isAdmin(user);
   const [project, setProject] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -278,15 +284,17 @@ export default function ViewProjek() {
           </div>
         </div>
         <div className="flex gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            icon={Edit2}
-            onClick={() => navigate(`/projects/${project.uuid}/edit`)}
-            className="whitespace-nowrap"
-          >
-            Edit Project
-          </Button>
+          {canManage && (
+            <Button
+              type="button"
+              variant="secondary"
+              icon={Edit2}
+              onClick={() => navigate(`/projects/${project.uuid}/edit`)}
+              className="whitespace-nowrap"
+            >
+              Edit Project
+            </Button>
+          )}
         </div>
       </div>
 

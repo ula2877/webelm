@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import DashboardLayout from './components/layout/DashboardLayout';
+import AdminRoute from './components/routing/AdminRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
@@ -92,42 +93,56 @@ function AppRoutes() {
       >
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/users" element={<Users />} />
-        <Route path="/users/create" element={<CreateUser />} />
-        <Route path="/users/:id/edit" element={<EditUser />} />
-        <Route path="/letters" element={<SuratOverview />} />
-        <Route path="/letters/quotation" element={<SuratQuotation />} />
-        <Route path="/letters/quotation/create" element={<CreateSuratQuotation />} />
-        <Route path="/letters/quotation/:id/edit" element={<CreateSuratQuotation />} />
-        <Route path="/letters/quotation/:id/view" element={<ViewSuratQuotation />} />
-        <Route path="/letters/invoice" element={<SuratInvoice />} />
-        <Route path="/letters/invoice/create" element={<CreateSuratInvoice />} />
-        <Route path="/letters/invoice/:id/edit" element={<CreateSuratInvoice />} />
-        <Route path="/letters/invoice/:id/view" element={<ViewSuratInvoice />} />
-        <Route path="/letters/delivery-note" element={<SuratDeliveryNote />} />
-        <Route path="/letters/delivery-note/create" element={<CreateSuratDeliveryNote />} />
-        <Route path="/letters/delivery-note/:id/edit" element={<CreateSuratDeliveryNote />} />
-        <Route path="/letters/delivery-note/:id/view" element={<ViewSuratDeliveryNote />} />
-        <Route path="/letters/handover" element={<SuratHandover />} />
-        <Route path="/letters/handover/create" element={<CreateSuratHandover />} />
-        <Route path="/letters/handover/:id/edit" element={<CreateSuratHandover />} />
-        <Route path="/letters/handover/:id/view" element={<ViewSuratHandover />} />
-        <Route path="/letters/inspection-request" element={<SuratInspectionRequest />} />
-        <Route path="/letters/inspection-request/create" element={<CreateSuratInspectionRequest />} />
-        <Route path="/letters/inspection-request/:id/edit" element={<CreateSuratInspectionRequest />} />
-        <Route path="/letters/inspection-request/:id/view" element={<ViewSuratInspectionRequest />} />
-        <Route path="/letters/payment-request" element={<SuratPaymentRequest />} />
-        <Route path="/letters/payment-request/create" element={<CreateSuratPaymentRequest />} />
-        <Route path="/letters/payment-request/:id/edit" element={<CreateSuratPaymentRequest />} />
-        <Route path="/letters/payment-request/:id/view" element={<ViewSuratPaymentRequest />} />
-        <Route path="/letters/receipt" element={<SuratReceipt />} />
-        <Route path="/letters/receipt/create" element={<CreateSuratReceipt />} />
-        <Route path="/letters/receipt/:id/edit" element={<CreateSuratReceipt />} />
-        <Route path="/letters/receipt/:id/view" element={<ViewSuratReceipt />} />
+
+        {/* Khusus admin: User Management & Surat-menyurat. Parent route ini
+            melindungi SEMUA sub-route (create/edit/view/preview) sekaligus;
+            worker dialihkan ke /dashboard. */}
+        <Route element={<AdminRoute />}>
+          <Route path="/users" element={<Users />} />
+          <Route path="/users/create" element={<CreateUser />} />
+          <Route path="/users/:id/edit" element={<EditUser />} />
+          <Route path="/letters" element={<SuratOverview />} />
+          <Route path="/letters/quotation" element={<SuratQuotation />} />
+          <Route path="/letters/quotation/create" element={<CreateSuratQuotation />} />
+          <Route path="/letters/quotation/:id/edit" element={<CreateSuratQuotation />} />
+          <Route path="/letters/quotation/:id/view" element={<ViewSuratQuotation />} />
+          <Route path="/letters/invoice" element={<SuratInvoice />} />
+          <Route path="/letters/invoice/create" element={<CreateSuratInvoice />} />
+          <Route path="/letters/invoice/:id/edit" element={<CreateSuratInvoice />} />
+          <Route path="/letters/invoice/:id/view" element={<ViewSuratInvoice />} />
+          <Route path="/letters/delivery-note" element={<SuratDeliveryNote />} />
+          <Route path="/letters/delivery-note/create" element={<CreateSuratDeliveryNote />} />
+          <Route path="/letters/delivery-note/:id/edit" element={<CreateSuratDeliveryNote />} />
+          <Route path="/letters/delivery-note/:id/view" element={<ViewSuratDeliveryNote />} />
+          <Route path="/letters/handover" element={<SuratHandover />} />
+          <Route path="/letters/handover/create" element={<CreateSuratHandover />} />
+          <Route path="/letters/handover/:id/edit" element={<CreateSuratHandover />} />
+          <Route path="/letters/handover/:id/view" element={<ViewSuratHandover />} />
+          <Route path="/letters/inspection-request" element={<SuratInspectionRequest />} />
+          <Route path="/letters/inspection-request/create" element={<CreateSuratInspectionRequest />} />
+          <Route path="/letters/inspection-request/:id/edit" element={<CreateSuratInspectionRequest />} />
+          <Route path="/letters/inspection-request/:id/view" element={<ViewSuratInspectionRequest />} />
+          <Route path="/letters/payment-request" element={<SuratPaymentRequest />} />
+          <Route path="/letters/payment-request/create" element={<CreateSuratPaymentRequest />} />
+          <Route path="/letters/payment-request/:id/edit" element={<CreateSuratPaymentRequest />} />
+          <Route path="/letters/payment-request/:id/view" element={<ViewSuratPaymentRequest />} />
+          <Route path="/letters/receipt" element={<SuratReceipt />} />
+          <Route path="/letters/receipt/create" element={<CreateSuratReceipt />} />
+          <Route path="/letters/receipt/:id/edit" element={<CreateSuratReceipt />} />
+          <Route path="/letters/receipt/:id/view" element={<ViewSuratReceipt />} />
+        </Route>
+
         <Route path="/projects" element={<Projek />} />
-        <Route path="/projects/create" element={<CreateProjek />} />
-        <Route path="/projects/:uuid/edit" element={<CreateProjek />} />
         <Route path="/projects/:uuid/view" element={<ViewProjek />} />
+
+        {/* Create/Edit projek khusus admin. Worker (atau role non-admin lain)
+            yang mengetik URL langsung dialihkan ke /dashboard; backend juga
+            menolak create/update/delete dengan HTTP 403. */}
+        <Route element={<AdminRoute />}>
+          <Route path="/projects/create" element={<CreateProjek />} />
+          <Route path="/projects/:uuid/edit" element={<CreateProjek />} />
+        </Route>
+
         <Route path="/profile" element={<Profile />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

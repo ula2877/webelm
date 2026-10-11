@@ -107,6 +107,70 @@ class UserManagementController extends Controller
     }
 
     /**
+     * GET /api/user-options
+     * ?search=&level=&page=&per_page=
+     *
+     * Daftar user RINGKAS untuk mengisi dropdown pada form yang bukan halaman
+     * User Management - khususnya pemilihan Client & Worker di form Projek,
+     * yang juga dipakai level worker.
+     *
+     * Sengaja hanya mengembalikan kolom aman (id, username, nama, id_level,
+     * role). Field sensitif seperti no_hp/alamat/tanggal hanya tersedia di
+     * GET /api/users yang dibatasi middleware 'admin'. Endpoint ini hanya
+     * butuh login (tidak admin) karena form Projek memang perlu daftar client
+     * dan worker.
+     */
+    public function options(Request $request): JsonResponse
+    {
+        $perPage = (int) $request->query('per_page', 20);
+        $perPage = max(1, min(100, $perPage));
+
+        $query = User::query()->with('level');
+
+        $search = trim((string) $request->query('search', ''));
+        if ($search !== '') {
+            $like = '%' . $this->escapeLike($search) . '%';
+            $query->where(function ($inner) use ($like) {
+                $inner->where('username', 'like', $like)
+                    ->orWhere('nama', 'like', $like);
+            });
+        }
+
+        $level = $request->query('level');
+        if ($level !== null && $level !== '' && $level !== 'all') {
+            if (!is_numeric($level)) {
+                throw ValidationException::withMessages([
+                    'level' => ['Filter level tidak valid.'],
+                ]);
+            }
+
+            $query->where('id_level', (int) $level);
+        }
+
+        $users = $query->orderBy('id_user')->paginate($perPage);
+
+        return response()->json([
+            'status' => 'ok',
+            'data' => array_map(fn (User $user) => [
+                'id' => (int) $user->id_user,
+                'username' => $user->username,
+                'nama' => $user->nama,
+                'id_level' => (int) $user->id_level,
+                'role' => $user->level ? $user->level->nama_level : null,
+            ], $users->items()),
+            'meta' => [
+                'current_page' => $users->currentPage(),
+                'last_page' => $users->lastPage(),
+                'per_page' => $users->perPage(),
+                'total' => $users->total(),
+                'from' => $users->firstItem(),
+                'to' => $users->lastItem(),
+            ],
+            'roles' => $this->roleOptions(),
+        ], 200);
+    }
+
+    /**
      * GET /api/users/{id}/dependents
      *
      * Used by the delete confirmation dialog so a destructive action never

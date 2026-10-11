@@ -43,7 +43,7 @@ export default function ProjectUserSelect({
   useEffect(() => {
     let cancelled = false;
     usersService
-      .fetchUsers({ perPage: 1 })
+      .fetchUserOptions({ perPage: 1 })
       .then((res) => {
         if (cancelled || res?.status !== 'ok' || !Array.isArray(res.roles)) return;
         const ids = res.roles
@@ -73,7 +73,7 @@ export default function ProjectUserSelect({
     Promise.all(
       levelIds.map((level) =>
         usersService
-          .fetchUsers({ search: debouncedQuery, level, page: 1, perPage: 20 })
+          .fetchUserOptions({ search: debouncedQuery, level, page: 1, perPage: 20 })
           .catch(() => null)
       )
     )

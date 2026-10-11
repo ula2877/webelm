@@ -50,6 +50,9 @@ class ProjectController extends Controller
 
     private const DEFAULT_JENIS = 'project';
 
+    /** tb_level.id_level yang dianggap admin (privileged). */
+    private const ADMIN_LEVEL_IDS = [1];
+
     /**
      * GET /api/projects
      * ?search=&status=&jenis=&urgency=&pelunasan=&page=&per_page=
@@ -72,6 +75,15 @@ class ProjectController extends Controller
                 'pembayaran as dp_count' => fn ($q) => $q->where('pelunasan', 'dp'),
             ])
             ->withSum('pembayaran as total_pembayaran', 'nominal');
+
+        // Pembatasan non-admin: hanya projek yang ditugaskan ke user ini
+        // melalui tb_tim (id_worker = user login). Admin melihat seluruh
+        // projek. Karena diterapkan pada query dasar, total & pagination ikut
+        // menghitung hanya projek yang ditugaskan.
+        if (!$this->isAdminUser()) {
+            $userId = $this->currentUserId();
+            $query->whereHas('team', fn ($q) => $q->where('id_worker', $userId));
+        }
 
         // Search hits uuid_project, judul, deskripsi AND nama customer
         // (relasi existing id_client -> tb_user, tanpa tabel baru).
@@ -164,7 +176,7 @@ class ProjectController extends Controller
     {
         $project = Project::with(['client', 'team.worker', 'pembayaran'])->find($id);
 
-        if (!$project) {
+        if (!$project || !$this->canAccessProject($project)) {
             return $this->notFound();
         }
 
@@ -184,7 +196,7 @@ class ProjectController extends Controller
             ->where('uuid_project', $uuid)
             ->first();
 
-        if (!$project) {
+        if (!$project || !$this->canAccessProject($project)) {
             return $this->notFound();
         }
 
@@ -730,7 +742,7 @@ class ProjectController extends Controller
     {
         $project = Project::where('uuid_project', $uuid)->first();
 
-        if (!$project) {
+        if (!$project || !$this->canAccessProject($project)) {
             return $this->notFound();
         }
 
@@ -842,7 +854,7 @@ class ProjectController extends Controller
     {
         $project = Project::where('uuid_project', $uuid)->first();
 
-        if (!$project) {
+        if (!$project || !$this->canAccessProject($project)) {
             return $this->notFound();
         }
 
@@ -889,7 +901,7 @@ class ProjectController extends Controller
     {
         $project = Project::where('uuid_project', $uuid)->first();
 
-        if (!$project) {
+        if (!$project || !$this->canAccessProject($project)) {
             return $this->notFound();
         }
 
@@ -1059,7 +1071,7 @@ class ProjectController extends Controller
     {
         $project = Project::where('uuid_project', $uuid)->first();
 
-        if (!$project) {
+        if (!$project || !$this->canAccessProject($project)) {
             return $this->notFound();
         }
 
@@ -2117,6 +2129,53 @@ class ProjectController extends Controller
             return $bytes . ' ' . $units[0];
         }
         return sprintf('%.2f %s', $bytes / (1024 ** $factor), $units[$factor]);
+    }
+
+    /**
+     * Apakah user yang login adalah admin (level 1)? Role dibaca dari sesi
+     * autentikasi Laravel (tb_user.id_level), TIDAK pernah dari parameter/body
+     * yang dikirim klien.
+     */
+    private function isAdminUser(): bool
+    {
+        $user = Auth::user();
+
+        return $user !== null
+            && in_array((int) $user->id_level, self::ADMIN_LEVEL_IDS, true);
+    }
+
+    /** id_user user yang login (0 bila tidak ada sesi). */
+    private function currentUserId(): int
+    {
+        $user = Auth::user();
+
+        return $user !== null ? (int) $user->id_user : 0;
+    }
+
+    /**
+     * Apakah user yang login boleh MELIHAT projek ini?
+     *   - admin (level 1) : seluruh projek.
+     *   - selain admin    : hanya projek yang terhubung lewat tb_tim
+     *     (tb_tim.id_project = projek, tb_tim.id_worker = user login).
+     *
+     * Identitas user selalu dari sesi; id_project/id_worker dari klien tidak
+     * pernah dipakai sebagai dasar otorisasi.
+     */
+    private function canAccessProject(Project $project): bool
+    {
+        if ($this->isAdminUser()) {
+            return true;
+        }
+
+        $userId = $this->currentUserId();
+        if ($userId <= 0) {
+            return false;
+        }
+
+        return DB::table('tb_tim')
+            ->where('id_project', (int) $project->id_project)
+            ->where('id_worker', $userId)
+            ->exists();
     }
 
     private function notFound(): JsonResponse

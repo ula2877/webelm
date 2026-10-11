@@ -23,6 +23,22 @@ export async function fetchUsers({ search = '', level = '', page = 1, perPage = 
   return response.data;
 }
 
+// Opsi user RINGKAS untuk dropdown form (mis. form Projek memilih Client &
+// Worker). Berbeda dengan fetchUsers (khusus admin), endpoint ini bisa dipakai
+// semua user yang sudah login dan hanya mengembalikan kolom aman
+// (id, username, nama, role) - tanpa no_hp/alamat.
+export async function fetchUserOptions({ search = '', level = '', page = 1, perPage = 20 } = {}) {
+  const response = await api.get('/api/user-options', {
+    params: {
+      search: search.trim(),
+      level: level === 'all' ? '' : level,
+      page,
+      per_page: perPage,
+    },
+  });
+  return response.data;
+}
+
 export async function createUser(payload) {
   const response = await api.post('/api/users', payload);
   return response.data;

@@ -8,11 +8,13 @@ import {
   Info,
 } from 'lucide-react';
 import Card, { CardHeader, CardTitle } from '../components/ui/Card';
+import EmptyState from '../components/ui/EmptyState';
 import ErrorState from '../components/ui/ErrorState';
 import { PageLoading } from '../components/ui/LoadingSpinner';
 import ProjectCountChart from '../components/charts/ProjectCountChart';
 import IncomeChart from '../components/charts/IncomeChart';
 import PelunasanChart from '../components/charts/PelunasanChart';
+import MonthlyRecapTable from '../components/MonthlyRecapTable';
 import { fetchDashboard } from '../services/dashboard';
 import { rupiah } from '../utils/suratJenis';
 
@@ -27,12 +29,70 @@ const selectClass =
 /** Satu baris angka di dalam card KPI. */
 function StatLine({ label, value, tone = 'text-text-primary', icon: Icon }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="flex items-center gap-2 text-sm text-text-secondary">
+    <div className="flex items-center justify-between gap-3" data-stat-line>
+      <span
+        className="flex items-center gap-2 text-sm text-text-secondary"
+        data-stat-label
+      >
         {Icon && <Icon className="w-4 h-4" />}
         {label}
       </span>
-      <span className={`text-lg font-bold ${tone}`}>{value}</span>
+      <span className={`text-lg font-bold ${tone}`} data-stat-value={value}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Dashboard khusus worker - hanya projek yang ditugaskan ke user yang login
+ * (data sudah dibatasi di backend lewat tb_tim; ini murni tampilan).
+ */
+function WorkerDashboardView({ projects = {}, series = [] }) {
+  const total = projects.total ?? 0;
+  const isEmpty = total === 0;
+
+  return (
+    <div
+      className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch"
+      data-worker-layout
+    >
+      {/* Kolom kiri: Projek Dikerjakan (2/5 = 40% di desktop). */}
+      <Card className="space-y-4 lg:col-span-2">
+        <div className="flex items-center gap-2">
+          <span className="w-9 h-9 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center">
+            <FolderKanban className="w-5 h-5" />
+          </span>
+          <h3 className="text-base font-semibold text-text-primary">Projek Dikerjakan</h3>
+        </div>
+        <div className="space-y-3">
+          <StatLine label="Running" value={projects.running ?? 0} tone="text-blue-600" icon={Clock} />
+          <StatLine label="Done" value={projects.done ?? 0} tone="text-emerald-600" icon={CheckCircle2} />
+          <StatLine label="Total" value={total} />
+        </div>
+        <p className="text-xs text-text-muted">
+          Total = seluruh projek yang pernah ditugaskan kepada Anda (termasuk
+          yang dibatalkan); setiap projek dihitung satu kali.
+        </p>
+      </Card>
+
+      {/* Kolom kanan: Tren Projek (3/5 = 60% di desktop). */}
+      {isEmpty ? (
+        <Card className="lg:col-span-3">
+          <EmptyState
+            icon={FolderKanban}
+            title="Belum ada projek ditugaskan"
+            description="Projek yang melibatkan Anda akan muncul di sini begitu admin menugaskan Anda."
+          />
+        </Card>
+      ) : (
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle>Tren Projek (6 Bulan Terakhir)</CardTitle>
+          </CardHeader>
+          <ProjectCountChart data={series} />
+        </Card>
+      )}
     </div>
   );
 }
@@ -79,10 +139,13 @@ export default function Dashboard() {
   }, [month, year, reloadKey]);
 
   const period = data?.period;
+  const isWorker = data?.scope === 'worker';
+  const workerName = data?.worker?.nama;
   const projects = data?.projects;
   const income = data?.income;
   const pelunasan = data?.pelunasan;
   const series = data?.series || [];
+  const monthlyRecap = data?.monthly_recap || [];
   const highlightKey = `${year}-${String(month).padStart(2, '0')}`;
 
   const yearOptions = useMemo(() => {
@@ -105,10 +168,13 @@ export default function Dashboard() {
         <div>
           <h2 className="page-title">Dashboard</h2>
           <p className="page-subtitle">
-            Ringkasan projek &amp; pendapatan ELMECH
-            {period?.label ? ` — ${period.label}` : ''}
+            {isWorker
+              ? `Ringkasan projek yang ditugaskan${workerName ? ` — ${workerName}` : ''}`
+              : 'Ringkasan projek &amp; pendapatan ELMECH'}
+            {!isWorker && period?.label ? ` — ${period.label}` : ''}
           </p>
         </div>
+        {!isWorker && (
         <div className="flex items-end gap-3">
           <div>
             <label htmlFor="dash-month" className="block text-xs font-medium text-text-secondary mb-1">
@@ -147,6 +213,7 @@ export default function Dashboard() {
             </select>
           </div>
         </div>
+        )}
       </div>
 
       {isLoading && <PageLoading />}
@@ -159,7 +226,9 @@ export default function Dashboard() {
         />
       )}
 
-      {!isLoading && !error && data && (
+      {!isLoading && !error && data && (isWorker ? (
+        <WorkerDashboardView projects={data.projects} series={data.series || []} />
+      ) : (
         <>
           {isEmpty && (
             <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm text-text-secondary">
@@ -258,8 +327,26 @@ export default function Dashboard() {
             </CardHeader>
             <IncomeChart data={series} highlightKey={highlightKey} />
           </Card>
+
+          {/* Rekap bulanan 12 bulan - tren historis independen dari selector */}
+          <Card className="!p-0 overflow-hidden">
+            <div className="px-6 pt-6">
+              <CardHeader className="!mb-1">
+                <CardTitle>Rekap Bulanan Projek</CardTitle>
+              </CardHeader>
+              <p className="text-xs text-text-muted mb-4">
+                Jumlah projek dihitung dari tanggal mulai; income adalah total
+                pembayaran projek pada bulan tersebut. Karena data pembayaran tidak
+                menyimpan tanggal transaksi, bulan income mengikuti tanggal mulai
+                projek terkait.
+              </p>
+            </div>
+            <div className="px-6 pb-4">
+              <MonthlyRecapTable rows={monthlyRecap} highlightKey={highlightKey} />
+            </div>
+          </Card>
         </>
-      )}
+        ))}
     </div>
   );
 }

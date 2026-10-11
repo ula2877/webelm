@@ -8,6 +8,8 @@ import Pagination from '../components/ui/Pagination';
 import EmptyState from '../components/ui/EmptyState';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import * as projectService from '../services/projects';
+import { useAuth } from '../context/AuthContext';
+import { isAdmin } from '../utils/roles';
 import { rupiah } from '../utils/suratJenis';
 import {
   PROJECT_PELUNASAN_FILTER,
@@ -34,6 +36,10 @@ const CFG = {
 export default function Projek() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
+  // Create/Edit/Hapus projek hanya untuk admin. Worker hanya melihat detail
+  // projek yang ditugaskan; ini lapisan UX, enforcement ada di backend.
+  const canManage = isAdmin(user);
   const [projects, setProjects] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -182,9 +188,11 @@ export default function Projek() {
           <h2 className="page-title">{CFG.label}</h2>
           <p className="page-subtitle">Kelola data projek</p>
         </div>
-        <Button icon={Plus} onClick={() => navigate(`/${CFG.routeBase}/create`)}>
-          Buat Projek
-        </Button>
+        {canManage && (
+          <Button icon={Plus} onClick={() => navigate(`/${CFG.routeBase}/create`)}>
+            Buat Projek
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -354,20 +362,24 @@ export default function Projek() {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          <button
-                            className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors"
-                            title="Edit"
-                            onClick={() => navigate(`/${CFG.routeBase}/${p.uuid}/edit`)}
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            className="p-2 rounded-lg text-text-muted hover:text-red-600 hover:bg-red-50 transition-colors"
-                            title="Hapus"
-                            onClick={() => setDeleteConfirm({ isOpen: true, item: p })}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {canManage && (
+                            <>
+                              <button
+                                className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                                title="Edit"
+                                onClick={() => navigate(`/${CFG.routeBase}/${p.uuid}/edit`)}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                className="p-2 rounded-lg text-text-muted hover:text-red-600 hover:bg-red-50 transition-colors"
+                                title="Hapus"
+                                onClick={() => setDeleteConfirm({ isOpen: true, item: p })}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
