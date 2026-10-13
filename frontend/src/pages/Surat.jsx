@@ -5,7 +5,9 @@ import Input, { Select } from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
 import Pagination from '../components/ui/Pagination';
 import EmptyState from '../components/ui/EmptyState';
+import SortableHeader from '../components/ui/SortableHeader';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import useTableSort from '../hooks/useTableSort';
 import * as suratService from '../services/surat';
 import { formatDate } from '../utils/helpers';
 
@@ -21,6 +23,7 @@ export default function Surat() {
   const [totalItems, setTotalItems] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [notice, setNotice] = useState(null);
+  const { sort, toggleSort, resetSort, sortParams } = useTableSort();
 
   // Ref for search input to maintain focus
   const searchInputRef = useRef(null);
@@ -51,6 +54,7 @@ export default function Surat() {
         status: statusFilter,
         page: currentPage,
         perPage: ITEMS_PER_PAGE,
+        ...sortParams,
       });
       if (response.status === 'ok') {
         const lastPage = Math.max(1, response.meta.last_page);
@@ -68,11 +72,17 @@ export default function Surat() {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearchQuery, statusFilter, currentPage]);
+  }, [debouncedSearchQuery, statusFilter, currentPage, sort]);
 
   useEffect(() => {
     fetchSuratData();
   }, [fetchSuratData]);
+
+  // Sorting: klik header mengubah siklus asc -> desc -> default.
+  const handleSort = (key) => {
+    toggleSort(key);
+    setCurrentPage(1);
+  };
 
   // Reset filter
   const handleResetFilter = () => {
@@ -80,6 +90,7 @@ export default function Surat() {
     setDebouncedSearchQuery('');
     setStatusFilter('');
     setCurrentPage(1);
+    resetSort();
     // Focus search input after state updates
     setTimeout(() => {
       searchInputRef.current?.focus();
@@ -188,11 +199,11 @@ export default function Surat() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-gray-50/50">
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Nomor</th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Perihal</th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Penerima</th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Tanggal</th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Status</th>
+                    <SortableHeader label="Nomor" sortKey="nomor" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Perihal" sortKey="perihal" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Penerima" sortKey="pengirim" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Tanggal" sortKey="tanggal" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Status" sortKey="status" sort={sort} onSort={handleSort} />
                     <th className="text-right py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Aksi</th>
                   </tr>
                 </thead>

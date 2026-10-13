@@ -149,8 +149,56 @@ class ProjectController extends Controller
             $query->where('jenis', $jenis);
         }
 
-        // Stable order so pagination never repeats or skips a row.
-        $projects = $query->orderBy('id_project')->paginate($perPage, ['*'], 'page', $currentPage);
+        // Server-side sorting. Column names are whitelisted here and never
+        // taken from the request; the role filter above is always applied
+        // first, so a worker can only ever sort the projects assigned to them.
+        // Default order stays id_project so pagination is stable.
+        $direction = strtolower((string) $request->query('sort_order', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $applied = false;
+
+        switch ($request->query('sort_by')) {
+            case 'projek':
+            case 'name':
+            case 'judul':
+                // Column PROJEK shows customer + project name; the project
+                // name (judul) is the primary sort field.
+                $query->orderBy('tb_project.judul', $direction);
+                $applied = true;
+                break;
+            case 'customer':
+                // Optional: sort by the client name (tb_user) instead.
+                $query->leftJoin('tb_user as client_user', 'client_user.id_user', '=', 'tb_project.id_client')
+                    ->select('tb_project.*')
+                    ->orderBy('client_user.nama', $direction);
+                $applied = true;
+                break;
+            case 'tanggal_mulai':
+            case 'tanggal_estimasi':
+            case 'tanggal_selesai':
+            case 'urgency':
+            case 'status':
+            case 'harga':
+                $query->orderBy('tb_project.' . $request->query('sort_by'), $direction);
+                $applied = true;
+                break;
+            case 'pelunasan':
+                // Same values as present(): lunas > dp > belum_bayar. The
+                // aliases come from withCount()/withSum() above.
+                $query->orderByRaw(
+                    '(CASE WHEN lunas_count > 0 THEN 2 WHEN dp_count > 0 THEN 1 ELSE 0 END) ' . $direction
+                );
+                $applied = true;
+                break;
+        }
+
+        if ($applied) {
+            // Secondary key keeps the order deterministic for equal values.
+            $query->orderBy('tb_project.id_project');
+        } else {
+            $query->orderBy('id_project');
+        }
+
+        $projects = $query->paginate($perPage, ['*'], 'page', $currentPage);
 
         return response()->json([
             'status' => 'ok',

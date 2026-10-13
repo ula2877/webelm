@@ -87,8 +87,42 @@ class UserManagementController extends Controller
             $query->where('id_level', (int) $level);
         }
 
-        // Stable order so pagination never repeats or skips a row.
-        $users = $query->orderBy('id_user')->paginate($perPage);
+        // Server-side sorting. Only whitelisted columns are accepted - the
+        // request value is never interpolated into SQL. `role` sorts by the
+        // level name shown in the UI (tb_level.nama_level). Default order
+        // stays id_user so pagination never repeats or skips a row.
+        $direction = strtolower((string) $request->query('sort_order', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $applied = false;
+
+        switch ($request->query('sort_by')) {
+            case 'nama':
+            case 'username':
+            case 'no_hp':
+            case 'alamat':
+                $query->orderBy('tb_user.' . $request->query('sort_by'), $direction);
+                $applied = true;
+                break;
+            case 'created':
+                $query->orderBy('tb_user.created_at', $direction);
+                $applied = true;
+                break;
+            case 'role':
+                // Join only for this sort so the other queries are untouched.
+                $query->leftJoin('tb_level', 'tb_level.id_level', '=', 'tb_user.id_level')
+                    ->select('tb_user.*')
+                    ->orderBy('tb_level.nama_level', $direction);
+                $applied = true;
+                break;
+        }
+
+        if ($applied) {
+            // Secondary key keeps the order deterministic for equal values.
+            $query->orderBy('tb_user.id_user');
+        } else {
+            $query->orderBy('id_user');
+        }
+
+        $users = $query->paginate($perPage);
 
         return response()->json([
             'status' => 'ok',

@@ -9,7 +9,9 @@ import Avatar from '../components/ui/Avatar';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import Pagination from '../components/ui/Pagination';
 import EmptyState from '../components/ui/EmptyState';
+import SortableHeader from '../components/ui/SortableHeader';
 import { formatDate } from '../utils/helpers';
+import useTableSort from '../hooks/useTableSort';
 import * as usersService from '../services/users';
 import { useAuth } from '../context/AuthContext';
 
@@ -45,6 +47,7 @@ export default function Users() {
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, user: null, dependents: null });
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [notice, setNotice] = useState(null);
+  const { sort, toggleSort, resetSort, sortParams } = useTableSort();
 
   // Ref for search input to maintain focus
   const searchInputRef = useRef(null);
@@ -83,6 +86,7 @@ export default function Users() {
         level: roleFilter,
         page: currentPage,
         perPage: ITEMS_PER_PAGE,
+        ...sortParams,
       });
       if (response.status === 'ok') {
         const lastPage = Math.max(1, response.meta.last_page);
@@ -103,11 +107,18 @@ export default function Users() {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearchQuery, roleFilter, currentPage]);
+  }, [debouncedSearchQuery, roleFilter, currentPage, sort]);
 
   useEffect(() => {
     fetchUsersData();
   }, [fetchUsersData]);
+
+  // Sorting: klik header mengubah siklus asc -> desc -> default dan
+  // mengembalikan pagination ke halaman pertama.
+  const handleSort = (key) => {
+    toggleSort(key);
+    setCurrentPage(1);
+  };
 
   // Reset filter
   const handleResetFilter = () => {
@@ -115,6 +126,7 @@ export default function Users() {
     setDebouncedSearchQuery('');
     setRoleFilter('');
     setCurrentPage(1);
+    resetSort();
     // Focus search input after state updates
     setTimeout(() => {
       searchInputRef.current?.focus();
@@ -316,11 +328,11 @@ export default function Users() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-gray-50/50">
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">User</th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Role</th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">No HP</th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Alamat</th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Created</th>
+                    <SortableHeader label="User" sortKey="nama" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Role" sortKey="role" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="No HP" sortKey="no_hp" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Alamat" sortKey="alamat" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Created" sortKey="created" sort={sort} onSort={handleSort} />
                     <th className="text-right py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>

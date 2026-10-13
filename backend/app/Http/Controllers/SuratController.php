@@ -131,10 +131,64 @@ class SuratController extends Controller
             }
         }
 
-        // Stable order so pagination never repeats or skips a row.
-        $surat = $query->orderBy('tanggal', 'desc')
-            ->orderBy('id_surat', 'desc')
-            ->paginate($perPage, ['*'], 'page', $currentPage);
+        // Server-side sorting. Column names are whitelisted; the request value
+        // is never interpolated into SQL. perihal/pengirim/nomorInvoice/status
+        // live inside the JSON `data` column, so they sort through the same
+        // fallback keys used by present(). Default order stays
+        // tanggal desc, id_surat desc.
+        $direction = strtolower((string) $request->query('sort_order', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $applied = false;
+
+        switch ($request->query('sort_by')) {
+            case 'nomor':
+                // Lexicographic sort on the displayed nomor - document numbers
+                // are not assumed to be plain integers.
+                $query->orderBy('nomor', $direction);
+                $applied = true;
+                break;
+            case 'tanggal':
+                $query->orderBy('tanggal', $direction);
+                $applied = true;
+                break;
+            case 'total':
+                $query->orderBy('total', $direction);
+                $applied = true;
+                break;
+            case 'perihal':
+                $query->orderByRaw(
+                    "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data, '\$.subject')), JSON_UNQUOTE(JSON_EXTRACT(data, '\$.perihal')), '') " . $direction
+                );
+                $applied = true;
+                break;
+            case 'pengirim':
+                $query->orderByRaw(
+                    "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data, '\$.customerName')), JSON_UNQUOTE(JSON_EXTRACT(data, '\$.pengirim')), '') " . $direction
+                );
+                $applied = true;
+                break;
+            case 'nomorInvoice':
+                $query->orderByRaw(
+                    "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data, '\$.nomorInvoice')), '') " . $direction
+                );
+                $applied = true;
+                break;
+            case 'status':
+                $query->orderByRaw(
+                    "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data, '\$.status')), CASE WHEN deleted_at IS NULL THEN 'Aktif' ELSE 'Dihapus' END) " . $direction
+                );
+                $applied = true;
+                break;
+        }
+
+        if ($applied) {
+            // Secondary key keeps the order deterministic for equal values.
+            $query->orderBy('id_surat', 'desc');
+        } else {
+            $query->orderBy('tanggal', 'desc')
+                ->orderBy('id_surat', 'desc');
+        }
+
+        $surat = $query->paginate($perPage, ['*'], 'page', $currentPage);
 
         return response()->json([
             'status' => 'ok',

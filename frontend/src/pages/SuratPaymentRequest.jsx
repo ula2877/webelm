@@ -6,8 +6,10 @@ import Button from '../components/ui/Button';
 import Pagination from '../components/ui/Pagination';
 import EmptyState from '../components/ui/EmptyState';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import SortableHeader from '../components/ui/SortableHeader';
 import PaymentRequestPreview from '../components/PaymentRequestPreview';
 import { buildPreviewHtml } from '../utils/quotationPrintHtml';
+import useTableSort from '../hooks/useTableSort';
 import * as suratService from '../services/surat';
 import { formFromPpbDetail } from '../utils/paymentRequest';
 
@@ -37,6 +39,7 @@ export default function SuratPaymentRequest() {
   const [downloadingId, setDownloadingId] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, item: null });
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const { sort, toggleSort, resetSort, sortParams } = useTableSort();
 
   const searchInputRef = useRef(null);
   const noticeTimerRef = useRef(null);
@@ -60,6 +63,7 @@ export default function SuratPaymentRequest() {
         jenis: JENIS_FILTER,
         page: currentPage,
         perPage: ITEMS_PER_PAGE,
+        ...sortParams,
       });
       if (response.status === 'ok') {
         const lastPage = Math.max(1, response.meta.last_page);
@@ -76,16 +80,23 @@ export default function SuratPaymentRequest() {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearchQuery, currentPage]);
+  }, [debouncedSearchQuery, currentPage, sort]);
 
   useEffect(() => {
     fetchSuratData();
   }, [fetchSuratData]);
 
+  // Sorting: klik header mengubah siklus asc -> desc -> default.
+  const handleSort = (key) => {
+    toggleSort(key);
+    setCurrentPage(1);
+  };
+
   const handleResetFilter = () => {
     setSearchQuery('');
     setDebouncedSearchQuery('');
     setCurrentPage(1);
+    resetSort();
     setTimeout(() => searchInputRef.current?.focus(), 0);
   };
 
@@ -256,18 +267,10 @@ export default function SuratPaymentRequest() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-gray-50/50">
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      Nomor
-                    </th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      Perihal
-                    </th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      Tujuan
-                    </th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      Tanggal
-                    </th>
+                    <SortableHeader label="Nomor" sortKey="nomor" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Perihal" sortKey="perihal" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Tujuan" sortKey="pengirim" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Tanggal" sortKey="tanggal" sort={sort} onSort={handleSort} />
                     <th className="text-right py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
                       Aksi
                     </th>

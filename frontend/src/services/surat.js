@@ -3,7 +3,15 @@ import api from './api';
 // Surat - semua operasi baca pada tabel existing `tb_surat`.
 // Tidak ada endpoint baru untuk data lain dan tidak ada kolom tambahan.
 
-export async function fetchSurat({ search = '', jenis = '', status = '', page = 1, perPage = 6 } = {}) {
+export async function fetchSurat({
+  search = '',
+  jenis = '',
+  status = '',
+  page = 1,
+  perPage = 6,
+  sortBy = '',
+  sortOrder = '',
+} = {}) {
   const response = await api.get('/api/surat', {
     params: {
       search: search.trim(),
@@ -11,6 +19,9 @@ export async function fetchSurat({ search = '', jenis = '', status = '', page = 
       status: status === 'all' ? '' : status,
       page,
       per_page: perPage,
+      // Sorting server-side (whitelist di backend). Kosong = urutan default.
+      sort_by: sortBy,
+      sort_order: sortOrder,
     },
   });
 

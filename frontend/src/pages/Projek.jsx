@@ -7,6 +7,8 @@ import Badge from '../components/ui/Badge';
 import Pagination from '../components/ui/Pagination';
 import EmptyState from '../components/ui/EmptyState';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import SortableHeader from '../components/ui/SortableHeader';
+import useTableSort from '../hooks/useTableSort';
 import * as projectService from '../services/projects';
 import { useAuth } from '../context/AuthContext';
 import { isAdmin } from '../utils/roles';
@@ -53,6 +55,7 @@ export default function Projek() {
   const [notice, setNotice] = useState(location.state?.notice || null);
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, item: null });
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const { sort, toggleSort, resetSort, sortParams } = useTableSort();
 
   const searchInputRef = useRef(null);
   const noticeTimerRef = useRef(null);
@@ -87,6 +90,7 @@ export default function Projek() {
         status: statusFilter,
         page: currentPage,
         perPage: ITEMS_PER_PAGE,
+        ...sortParams,
       });
       if (response.status === 'ok') {
         const lastPage = Math.max(1, response.meta.last_page);
@@ -103,11 +107,17 @@ export default function Projek() {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearchQuery, pelunasanFilter, urgencyFilter, statusFilter, currentPage]);
+  }, [debouncedSearchQuery, pelunasanFilter, urgencyFilter, statusFilter, currentPage, sort]);
 
   useEffect(() => {
     fetchProjectsData();
   }, [fetchProjectsData]);
+
+  // Sorting: klik header mengubah siklus asc -> desc -> default.
+  const handleSort = (key) => {
+    toggleSort(key);
+    setCurrentPage(1);
+  };
 
   const handleResetFilter = () => {
     setSearchQuery('');
@@ -116,6 +126,7 @@ export default function Projek() {
     setUrgencyFilter('');
     setStatusFilter('');
     setCurrentPage(1);
+    resetSort();
     setTimeout(() => searchInputRef.current?.focus(), 0);
   };
 
@@ -285,30 +296,14 @@ export default function Projek() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-gray-50/50">
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      Projek
-                    </th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      Tanggal Mulai
-                    </th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      Tanggal Estimasi
-                    </th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      Tanggal Selesai
-                    </th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      Harga
-                    </th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      Pelunasan
-                    </th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      Urgency
-                    </th>
-                    <th className="text-left py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      Status
-                    </th>
+                    <SortableHeader label="Projek" sortKey="projek" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Tanggal Mulai" sortKey="tanggal_mulai" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Tanggal Estimasi" sortKey="tanggal_estimasi" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Tanggal Selesai" sortKey="tanggal_selesai" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Harga" sortKey="harga" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Pelunasan" sortKey="pelunasan" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Urgency" sortKey="urgency" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Status" sortKey="status" sort={sort} onSort={handleSort} />
                     <th className="text-right py-3 px-6 text-xs font-semibold text-text-muted uppercase tracking-wider">
                       Aksi
                     </th>

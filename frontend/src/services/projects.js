@@ -4,10 +4,31 @@
 import api from './api';
 
 export async function fetchProjects(
-  { search = '', status = '', jenis = '', urgency = '', pelunasan = '', page = 1, perPage = 6 } = {}
+  {
+    search = '',
+    status = '',
+    jenis = '',
+    urgency = '',
+    pelunasan = '',
+    page = 1,
+    perPage = 6,
+    sortBy = '',
+    sortOrder = '',
+  } = {}
 ) {
   const response = await api.get('/api/projects', {
-    params: { search, status, jenis, urgency, pelunasan, page, per_page: perPage },
+    params: {
+      search,
+      status,
+      jenis,
+      urgency,
+      pelunasan,
+      page,
+      per_page: perPage,
+      // Sorting server-side (whitelist di backend). Kosong = urutan default.
+      sort_by: sortBy,
+      sort_order: sortOrder,
+    },
   });
   return response.data;
 }

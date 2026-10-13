@@ -8,7 +8,14 @@ export async function fetchUserById(id) {
   return response.data;
 }
 
-export async function fetchUsers({ search = '', level = '', page = 1, perPage = 8 } = {}) {
+export async function fetchUsers({
+  search = '',
+  level = '',
+  page = 1,
+  perPage = 8,
+  sortBy = '',
+  sortOrder = '',
+} = {}) {
   const response = await api.get('/api/users', {
     params: {
       search: search.trim(),
@@ -17,6 +24,9 @@ export async function fetchUsers({ search = '', level = '', page = 1, perPage = 
       level: level === 'all' ? '' : level,
       page,
       per_page: perPage,
+      // Sorting server-side (whitelist di backend). Kosong = urutan default.
+      sort_by: sortBy,
+      sort_order: sortOrder,
     },
   });
 
