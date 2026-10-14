@@ -14,10 +14,13 @@ import {
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input, { Textarea, Select } from '../components/ui/Input';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import ProjectUserSelect from '../components/ProjectUserSelect';
 import QuotationPreview from '../components/QuotationPreview';
 import { buildPreviewHtml } from '../utils/quotationPrintHtml';
 import { cn } from '../utils/helpers';
 import * as suratService from '../services/surat';
+import * as usersService from '../services/users';
 import {
   createInitialForm,
   emptyItem,
@@ -438,7 +441,13 @@ export default function CreateSuratQuotation() {
           signature: s.id_asset_ttd ?? null,
           stamp: s.id_asset_stempel ?? null,
         });
-        setForm((prev) => ({ ...prev, ...formFromQuotationDetail(s) }));
+        const mapped = formFromQuotationDetail(s);
+        setForm((prev) => ({ ...prev, ...mapped }));
+        // Nilai manual terakhir = data penerima yang tersimpan,
+        // supaya berpindah mode saat edit tidak menghapusnya.
+        manualNameRef.current = mapped.customerName || '';
+        manualAddressRef.current = mapped.customerAddress || '';
+        previousClientIdRef.current = mapped.clientId ?? null;
       })
       .catch((err) => {
         if (!cancelled) setLoadError(err.message || 'Gagal memuat data surat.');
@@ -450,6 +459,111 @@ export default function CreateSuratQuotation() {
       cancelled = true;
     };
   }, [isEditMode, editId]);
+
+  // ---- Sumber informasi penerima: manual / dari client ----
+  // Nilai manual terakhir disimpan di ref supaya berpindah mode
+  // tidak menghapus data yang sudah diketik.
+  const manualNameRef = useRef('');
+  const manualAddressRef = useRef('');
+  const previousClientIdRef = useRef(null);
+  // Konfirmasi pergantian client (mengganti nama + alamat penerima).
+  const [clientChangeConfirm, setClientChangeConfirm] = useState({
+    isOpen: false,
+    clientId: null,
+    name: '',
+    address: '',
+  });
+
+  const applyClient = useCallback((clientId, name, address) => {
+    previousClientIdRef.current = clientId;
+    setForm((prev) => ({
+      ...prev,
+      clientId: clientId || null,
+      customerName: name,
+      customerAddress: address,
+    }));
+  }, []);
+
+  // Memilih client: ambil nama + alamat dari tb_user (GET /api/users/{id}),
+  // lalu isi otomatis. Bila penerima sudah diisi manual dan berbeda,
+  // minta konfirmasi dulu agar data tidak tertimpa tanpa sengaja.
+  const handleClientChange = useCallback(
+    (clientId) => {
+      if (!clientId) {
+        // Pilihan dihapus: tetap di mode client, field tidak dikosongkan.
+        setForm((prev) => ({ ...prev, clientId: null }));
+        previousClientIdRef.current = null;
+        return;
+      }
+      if (Number(clientId) === Number(previousClientIdRef.current)) return;
+      usersService
+        .fetchUserById(clientId)
+        .then((res) => {
+          if (res?.status !== 'ok' || !res.data) {
+            showNotice('error', 'Client tidak ditemukan.');
+            return;
+          }
+          const name = String(res.data.nama || '');
+          const address = String(res.data.alamat || '');
+          const currentName = String(form.customerName || '');
+          const currentAddress = String(form.customerAddress || '');
+          const differs = currentName !== name || currentAddress !== address;
+          const hasData = currentName.trim() !== '' || currentAddress.trim() !== '';
+          if (differs && hasData) {
+            // Data penerima sudah ada dan berbeda: konfirmasi dulu.
+            setClientChangeConfirm({
+              isOpen: true,
+              clientId: Number(clientId),
+              name,
+              address,
+            });
+            return;
+          }
+          applyClient(Number(clientId), name, address);
+        })
+        .catch((err) => {
+          showNotice('error', err.message || 'Gagal memuat data client.');
+        });
+    },
+    [showNotice, form.customerName, form.customerAddress, applyClient]
+  );
+
+  const confirmClientChange = useCallback(() => {
+    const c = clientChangeConfirm;
+    setClientChangeConfirm({ isOpen: false, clientId: null, name: '', address: '' });
+    if (c.clientId) {
+      applyClient(c.clientId, c.name, c.address);
+    }
+  }, [clientChangeConfirm, applyClient]);
+
+  const cancelClientChange = useCallback(() => {
+    setClientChangeConfirm({ isOpen: false, clientId: null, name: '', address: '' });
+    // Batalkan: kembalikan pilihan ke client sebelumnya.
+    setForm((prev) => ({ ...prev, clientId: previousClientIdRef.current }));
+  }, []);
+
+  // Berpindah sumber data penerima.
+  const handleReceiverSourceChange = useCallback((source) => {
+    setForm((prev) => {
+      if (source === 'client') {
+        // Simpan nilai manual sebelum berpindah.
+        manualNameRef.current = prev.customerName || '';
+        manualAddressRef.current = prev.customerAddress || '';
+        return { ...prev, receiverSource: 'client' };
+      }
+      // Kembali ke manual: pulihkan nilai manual terakhir bila ada.
+      const name = manualNameRef.current || prev.customerName || '';
+      const address = manualAddressRef.current || prev.customerAddress || '';
+      return {
+        ...prev,
+        receiverSource: 'manual',
+        clientId: null,
+        customerName: name,
+        customerAddress: address,
+      };
+    });
+    previousClientIdRef.current = null;
+  }, []);
 
   // ------------------------------------------------- signature / stamp images
   // Files are uploaded to the server (recorded in tb_surat_asset). The stored
@@ -726,6 +840,60 @@ export default function CreateSuratQuotation() {
 
           {/* 2. Informasi Penerima */}
           <Section title="Informasi Penerima">
+            {/* Sumber data penerima (segmented control). */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-text-primary mb-1.5">
+                Sumber Data Penerima
+              </label>
+              <div className="inline-flex rounded-lg border border-border overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => handleReceiverSourceChange('manual')}
+                  className={cn(
+                    'px-3 py-1.5 text-xs font-medium transition-colors',
+                    form.receiverSource !== 'client'
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-white text-text-secondary hover:bg-gray-50'
+                  )}
+                >
+                  Input Manual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleReceiverSourceChange('client')}
+                  className={cn(
+                    'px-3 py-1.5 text-xs font-medium transition-colors border-l border-border',
+                    form.receiverSource === 'client'
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-white text-text-secondary hover:bg-gray-50'
+                  )}
+                >
+                  Ambil dari Client
+                </button>
+              </div>
+              <p className="mt-1.5 text-xs text-text-muted">
+                {form.receiverSource === 'client'
+                  ? 'Pilih client terdaftar; nama dan alamat terisi otomatis dari data client.'
+                  : 'Isi nama dan alamat penerima secara manual.'}
+              </p>
+            </div>
+
+            {form.receiverSource === 'client' && (
+              <div className="mb-4">
+                <ProjectUserSelect
+                  label="Client"
+                  placeholder="Cari client..."
+                  levelNames="client"
+                  value={form.clientId}
+                  onChange={handleClientChange}
+                />
+                <p className="mt-1.5 text-xs text-text-muted">
+                  Nama dan alamat terisi otomatis dari client, tetap dapat
+                  dikoreksi.
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 gap-4">
               <Input
                 label="Nama Instansi / Perusahaan"
@@ -1101,6 +1269,18 @@ export default function CreateSuratQuotation() {
         </div>
       </div>
       )}
+
+      {/* Konfirmasi pergantian client (mengganti nama + alamat penerima). */}
+      <ConfirmDialog
+        isOpen={clientChangeConfirm.isOpen}
+        onClose={cancelClientChange}
+        onConfirm={confirmClientChange}
+        title="Ganti Client?"
+        message={`Data penerima akan diganti dengan data client yang dipilih:\n\nNama: ${clientChangeConfirm.name || '-'}\nAlamat: ${clientChangeConfirm.address || '-'}\n\nLanjutkan?`}
+        confirmLabel="Ganti"
+        cancelLabel="Batal"
+        variant="primary"
+      />
     </div>
   );
 }

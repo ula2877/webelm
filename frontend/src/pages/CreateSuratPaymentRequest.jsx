@@ -4,10 +4,12 @@ import { ArrowLeft, ChevronDown, ChevronUp, FileDown, Loader2, Plus, Trash2, X }
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input, { Textarea, Select } from '../components/ui/Input';
+import InvoiceSelect from '../components/InvoiceSelect';
 import PaymentRequestPreview from '../components/PaymentRequestPreview';
 import { buildPreviewHtml } from '../utils/quotationPrintHtml';
 import { cn } from '../utils/helpers';
 import * as suratService from '../services/surat';
+import { fetchProjectDetail } from '../services/projects';
 import { validateImageFile, emptyItem } from '../utils/suratJenis';
 import {
   buildPpbPayload,
@@ -29,14 +31,6 @@ const CFG = {
   label: 'Surat Permohonan Pembayaran',
   pdfPrefix: 'Surat-Permohonan-Pembayaran',
   jenis: 'payment-request',
-};
-
-// Label sumber dokumen di dropdown "Sumber Dokumen".
-const SUMBER_LABEL = {
-  ba: '[BAST] ',
-  inv: '[Invoice] ',
-  sj: '[Surat Jalan] ',
-  qr: '[Penawaran] ',
 };
 
 /**
@@ -190,62 +184,32 @@ export default function CreateSuratPaymentRequest() {
   }, [isEditMode, editId]);
 
   // ------------------------------------------------- Sumber dokumen (opsional)
-  const [sumberOptions, setSumberOptions] = useState([]);
-  const [sumberLoading, setSumberLoading] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    setSumberLoading(true);
-    Promise.all([
-      suratService.fetchSurat({ search: '', jenis: 'bast', page: 1, perPage: 100 }),
-      suratService.fetchSurat({ search: '', jenis: 'invoice', page: 1, perPage: 100 }),
-      suratService.fetchSurat({ search: '', jenis: 'delivery-note', page: 1, perPage: 100 }),
-      suratService.fetchSurat({ search: '', jenis: 'quotation', page: 1, perPage: 100 }),
-    ])
-      .then(([ba, inv, sj, qr]) => {
-        if (cancelled) return;
-        const opts = [];
-        (ba?.data || []).forEach((r) =>
-          opts.push({ kunci: 'ba', rawId: r.id, jenis: 'bast', nomor: r.nomor, nama: r.pengirim || '-' })
-        );
-        (inv?.data || []).forEach((r) =>
-          opts.push({ kunci: 'inv', rawId: r.id, jenis: 'invoice', nomor: r.nomor, nama: r.pengirim || '-' })
-        );
-        (sj?.data || []).forEach((r) =>
-          opts.push({ kunci: 'sj', rawId: r.id, jenis: 'delivery-note', nomor: r.nomor, nama: r.pengirim || '-' })
-        );
-        (qr?.data || []).forEach((r) =>
-          opts.push({ kunci: 'qr', rawId: r.id, jenis: 'quotation', nomor: r.nomor, nama: r.pengirim || '-' })
-        );
-        setSumberOptions(opts);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setSumberLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Opsi invoice dimuat internal oleh InvoiceSelect (pencarian berbasis
+  // GET /api/surat?jenis=invoice).
 
   /**
-   * Pilih sumber -> isi tujuan, identitas, dan komponen.
-   * PENTING: nomor sumber TIDAK pernah ditulis ke kolom nomor yang salah.
-   *  - BAST  -> hanya mengisi Nomor BAST / Tanggal BAST.
-   *  - Invoice / Surat Jalan / Penawaran -> TIDAK menyentuh Nomor BAST.
-   *  - Nomor surat modul ini sendiri tetap hasil hitungan backend.
+   * Pilih Invoice -> isi tujuan, SPK/PO, dan komponen dari invoice.
+   * PENTING: nomor invoice sumber TIDAK pernah ditulis ke kolom nomor
+   * yang salah. Nomor surat modul ini sendiri tetap hasil hitungan
+   * backend. Field yang sudah diketik user tidak tertimpa diam-diam
+   * (isiJikaBelumDiisi).
    */
-  const handleSumberChange = async (value) => {
-    if (!value) {
-      setForm((prev) => ({ ...prev, sumberId: null, sumberJenis: '' }));
+  const handleInvoiceChange = async (id) => {
+    if (!id) {
+      setForm((prev) => ({
+        ...prev,
+        sumberId: null,
+        sumberJenis: '',
+        sumberInvoiceId: null,
+        nomorInvoice: '',
+      }));
       return;
     }
-    const [kunci, rawId] = value.split(':');
-    const opsi = sumberOptions.find((o) => o.kunci === kunci && String(o.rawId) === rawId);
-    const jenis = opsi?.jenis || 'bast';
-    setField('sumberId', Number(rawId));
-    setField('sumberJenis', jenis);
+    setField('sumberId', Number(id));
+    setField('sumberJenis', 'invoice');
+    setField('sumberInvoiceId', Number(id));
     try {
-      const res = await suratService.fetchQuotationDetail(rawId);
+      const res = await suratService.fetchQuotationDetail(id);
       if (res?.status !== 'ok' || !res.data) return;
       const d = res.data.data || {};
       const items =
@@ -259,46 +223,40 @@ export default function CreateSuratPaymentRequest() {
             }))
           : null;
 
+      // Invoice yang dibuat dari projek membawa sumberProjectId -> judul
+      // projek dipakai sebagai nama pekerjaan bila tersedia.
+      let namaPekerjaan = '';
+      if (d.sumberProjectId) {
+        try {
+          const proj = await fetchProjectDetail(d.sumberProjectId);
+          if (proj?.status === 'ok' && proj.data) {
+            namaPekerjaan = proj.data.judul || '';
+          }
+        } catch {
+          // Projek tidak lagi tersedia - user mengisi manual.
+        }
+      }
+
       setForm((prev) => ({
         ...prev,
-        sumberId: Number(rawId),
-        sumberJenis: jenis,
-        // Nomor BAST hanya dari dokumen bertipe BAST.
-        nomorBAST:
-          jenis === 'bast' ? res.data.nomor || prev.nomorBAST : prev.nomorBAST,
-        tanggalBAST:
-          jenis === 'bast' ? res.data.tanggal || prev.tanggalBAST : prev.tanggalBAST,
-        // Nomor penawaran dari sumber yang memang punya field itu.
+        sumberId: Number(id),
+        sumberJenis: 'invoice',
+        sumberInvoiceId: Number(id),
+        nomorInvoice: res.data.nomor || '',
         nomorPenawaran: d.nomorPenawaran || prev.nomorPenawaran,
-        // SPK/PO mengikuti sumber; BAST tidak membawa nomor SPK baru.
-        nomorSPK: d.nomorPO || d.nomorSPK || prev.nomorSPK,
+        nomorSPK: d.nomorPo || prev.nomorSPK,
+        tanggalSPK: res.data.tanggal || prev.tanggalSPK,
         tujuanInstansi: isiJikaBelumDiisi(
           prev.tujuanInstansi,
-          d.tujuanInstansi || d.customerName || res.data.pengirim,
+          d.customerName || res.data.pengirim,
           ''
         ),
         tujuanJabatan: isiJikaBelumDiisi(prev.tujuanJabatan, d.tujuanJabatan, ''),
-        tujuanAlamat: isiJikaBelumDiisi(
-          prev.tujuanAlamat,
-          d.tujuanAlamat || d.customerAddress,
-          ''
-        ),
-        namaPekerjaan: isiJikaBelumDiisi(prev.namaPekerjaan, d.namaPekerjaan, ''),
-        // Pada BAST, pihak kedua = penyedia (CV. Elmech ...) yang menandatangani.
-        perusahaanNama: isiJikaBelumDiisi(
-          prev.perusahaanNama,
-          d.pihakKeduaNama || d.perusahaanNama,
-          PPB_DEFAULT_PERUSAHAAN
-        ),
-        perusahaanAlamat: isiJikaBelumDiisi(
-          prev.perusahaanAlamat,
-          d.pihakKeduaAlamat || d.perusahaanAlamat,
-          PPB_DEFAULT_ALAMAT
-        ),
+        namaPekerjaan: isiJikaBelumDiisi(prev.namaPekerjaan, namaPekerjaan, ''),
         items: items || prev.items,
       }));
     } catch (err) {
-      showNotice('error', err.message || 'Gagal memuat data sumber dokumen.');
+      showNotice('error', err.message || 'Gagal memuat data invoice.');
     }
   };
 
@@ -560,38 +518,19 @@ export default function CreateSuratPaymentRequest() {
           {/* ---------------------------------------------------------- FORM */}
           <div className="lg:col-span-1 min-w-0 space-y-6">
             {/* 1. Sumber Dokumen (opsional) */}
-            <Section
-              title="Sumber Dokumen"
-              subtitle="Opsional — isi otomatis dari BAST, Invoice, Surat Jalan, atau Penawaran."
-            >
+            <Section title="Informasi Sumber Invoice" subtitle="Opsional — isi otomatis dari Invoice yang tersimpan.">
               <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-1.5">
-                    Ambil dari Dokumen
-                  </label>
-                  <select
-                    value={form.sumberId && form.sumberJenis ? `${form.sumberJenis === 'bast' ? 'ba' : form.sumberJenis === 'invoice' ? 'inv' : form.sumberJenis === 'delivery-note' ? 'sj' : 'qr'}:${form.sumberId}` : ''}
-                    onChange={(e) => handleSumberChange(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  >
-                    <option value="">-- Tanpa sumber dokumen --</option>
-                    {sumberLoading ? (
-                      <option disabled>Memuat...</option>
-                    ) : (
-                      sumberOptions.map((o) => (
-                        <option key={o.id} value={`${o.kunci}:${o.rawId}`}>
-                          {SUMBER_LABEL[o.kunci]}
-                          {o.nomor} — {o.nama}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
+                <InvoiceSelect
+                  label="Ambil dari Invoice"
+                  placeholder="Cari nomor invoice atau customer..."
+                  value={form.sumberInvoiceId || ''}
+                  onChange={handleInvoiceChange}
+                />
                 <Input
-                  label="Nomor Penawaran"
-                  value={form.nomorPenawaran}
-                  onChange={(e) => setField('nomorPenawaran', e.target.value)}
-                  placeholder="Terisi otomatis jika sumber dipilih"
+                  label="Nomor Invoice"
+                  value={form.nomorInvoice}
+                  onChange={(e) => setField('nomorInvoice', e.target.value)}
+                  placeholder="Terisi otomatis jika invoice dipilih"
                 />
               </div>
             </Section>

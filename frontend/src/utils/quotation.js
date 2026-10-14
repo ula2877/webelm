@@ -84,6 +84,9 @@ export function buildQuotationPayload(form, assetIds = {}) {
     subject: form.subject || '',
     customerName: form.customerName || '',
     customerAddress: form.customerAddress || '',
+    // ID client (tb_user) bila penerima diambil dari data client.
+    // Opsional & nullable - tidak mengubah kontrak payload yang ada.
+    customerId: form.clientId || null,
     systemName: form.systemName || '',
     usePPN: !!form.usePPN,
     ppnRate: Number(form.ppnRate) || 0,
@@ -146,6 +149,12 @@ export function createInitialForm() {
     subject: '',
     customerName: '',
     customerAddress: '',
+    // Sumber informasi penerima: 'manual' (input sendiri) atau
+    // 'client' (diambil dari user role client). `clientId` hanya
+    // dipakai untuk memulihkan pilihan saat edit; nama/alamat
+    // tetap disimpan di customerName/customerAddress seperti semula.
+    receiverSource: 'manual',
+    clientId: null,
     systemName: '',
     items: [emptyItem()],
     usePPN: true,
@@ -309,6 +318,10 @@ export function formFromQuotationDetail(detail) {
     subject: d.subject ?? '',
     customerName: d.customerName ?? '',
     customerAddress: d.customerAddress ?? '',
+    // Relasi client tersimpan di JSON data (customerId).
+    // Surat lama (tanpa customerId) otomatis tetap mode manual.
+    receiverSource: d.customerId ? 'client' : 'manual',
+    clientId: d.customerId ?? null,
     systemName: d.systemName ?? '',
     usePPN: !!d.usePPN,
     ppnRate: d.ppnRate ?? '',

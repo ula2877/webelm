@@ -4,6 +4,7 @@ import { ArrowLeft, FileDown, Loader2 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input, { Textarea } from '../components/ui/Input';
+import InvoiceSelect from '../components/InvoiceSelect';
 import ReceiptPreview from '../components/ReceiptPreview';
 import { buildPreviewHtml } from '../utils/quotationPrintHtml';
 import { cn } from '../utils/helpers';
@@ -152,6 +153,9 @@ export default function CreateSuratReceipt() {
   }, [form.tanggal, isEditMode]);
 
   // ---- Mode EDIT ----
+  // Label invoice sumber untuk searchable select (dipakai saat invoice
+  // belum ada di opsi yang dimuat, mis. saat memuat kwitansi mode edit).
+  const [invoiceLabel, setInvoiceLabel] = useState('');
   useEffect(() => {
     if (!isEditMode) return undefined;
     let cancelled = false;
@@ -167,6 +171,18 @@ export default function CreateSuratReceipt() {
         }
         const { form: loaded } = formFromReceiptDetail(res.data);
         setForm(loaded);
+        // Muat label invoice sumber agar tampil terpilih saat edit.
+        if (loaded.sumberId && loaded.sumberJenis === 'invoice') {
+          suratService
+            .fetchQuotationDetail(loaded.sumberId)
+            .then((inv) => {
+              if (cancelled || inv?.status !== 'ok' || !inv.data) return;
+              setInvoiceLabel(
+                `${inv.data.nomor || '-'}${inv.data.pengirim ? ` — ${inv.data.pengirim}` : ''}`
+              );
+            })
+            .catch(() => {});
+        }
       })
       .catch((err) => {
         if (!cancelled) setLoadError(err.message || 'Gagal memuat data kwitansi.');
@@ -180,36 +196,20 @@ export default function CreateSuratReceipt() {
   }, [isEditMode, editId]);
 
   // ------------------------------------------------- Sumber: Invoice (opsional)
-  const [invoiceOptions, setInvoiceOptions] = useState([]);
-  const [invoiceLoading, setInvoiceLoading] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    setInvoiceLoading(true);
-    suratService
-      .fetchSurat({ search: '', jenis: 'invoice', page: 1, perPage: 100 })
-      .then((res) => {
-        if (!cancelled && res?.status === 'ok') setInvoiceOptions(res.data || []);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setInvoiceLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Opsi invoice dimuat internal oleh InvoiceSelect (pencarian berbasis
+  // GET /api/surat?jenis=invoice).
 
   // Pilih invoice -> isi penerima/nominal/nomor invoice. Invoice sumber
   // TIDAK diubah, dan field yang sudah diketik user tidak ditimpa.
-  const handleInvoiceChange = async (value) => {
-    if (!value) {
+  const handleInvoiceChange = async (id) => {
+    if (!id) {
       setForm((prev) => ({ ...prev, sumberId: null, sumberJenis: '' }));
       return;
     }
-    setField('sumberId', Number(value));
+    setField('sumberId', Number(id));
     setField('sumberJenis', 'invoice');
     try {
-      const res = await suratService.fetchQuotationDetail(value);
+      const res = await suratService.fetchQuotationDetail(id);
       if (res?.status !== 'ok' || !res.data) return;
       const d = res.data.data || {};
       // `total` tb_surat = grandTotal invoice (sudah termasuk PPN).
@@ -223,7 +223,7 @@ export default function CreateSuratReceipt() {
 
       setForm((prev) => ({
         ...prev,
-        sumberId: Number(value),
+        sumberId: Number(id),
         sumberJenis: 'invoice',
         nomorInvoice: res.data.nomor || prev.nomorInvoice,
         tanggalInvoice: res.data.tanggal || prev.tanggalInvoice,
@@ -381,25 +381,13 @@ export default function CreateSuratReceipt() {
             <Section title="Sumber Kwitansi" subtitle="Opsional — isi otomatis dari Invoice.">
               <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-text-primary mb-1.5">
-                    Ambil dari Invoice
-                  </label>
-                  <select
+                  <InvoiceSelect
+                    label="Ambil dari Invoice"
+                    placeholder="Cari nomor invoice atau customer..."
                     value={form.sumberId || ''}
-                    onChange={(e) => handleInvoiceChange(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  >
-                    <option value="">-- Tanpa sumber invoice --</option>
-                    {invoiceLoading ? (
-                      <option disabled>Memuat...</option>
-                    ) : (
-                      invoiceOptions.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.nomor} — {o.pengirim || '-'}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                    onChange={handleInvoiceChange}
+                    selectedLabel={invoiceLabel}
+                  />
                 </div>
                 <Input
                   label="Nomor Invoice"

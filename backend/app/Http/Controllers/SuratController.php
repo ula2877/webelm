@@ -306,6 +306,10 @@ class SuratController extends Controller
             'subject' => ['required', 'string', 'max:255'],
             'customerName' => ['required', 'string', 'max:255'],
             'customerAddress' => ['required', 'string'],
+            // Opsional: ID client (tb_user) bila penerima diambil
+            // dari data client. Hanya disimpan di JSON `data` untuk
+            // memulihkan pilihan saat edit; bukan kolom baru.
+            'customerId' => ['nullable', 'integer'],
             'systemName' => ['required', 'string', 'max:255'],
             'usePPN' => ['sometimes', 'boolean'],
             'ppnRate' => ['required_if:usePPN,true', 'nullable', 'numeric', 'min:0', 'max:100'],
@@ -449,6 +453,9 @@ class SuratController extends Controller
             'subject' => $validated['subject'],
             'customerName' => $validated['customerName'],
             'customerAddress' => $validated['customerAddress'],
+            // ID client (tb_user) bila penerima diambil dari
+            // data client - disimpan di JSON data (bukan kolom baru).
+            'customerId' => !empty($validated['customerId']) ? (int) $validated['customerId'] : null,
             'systemName' => $validated['systemName'],
             'usePPN' => $usePPN,
             'ppnRate' => $usePPN ? $ppnRate : 0,
@@ -645,6 +652,10 @@ class SuratController extends Controller
             'signature.signerName' => ['required', 'string', 'max:255'],
             'signature.signerTitle' => ['nullable', 'string', 'max:100'],
             'sumberQuotationId' => ['nullable', 'integer'],
+            // Opsional: ID projek sumber (tb_project.id_project) untuk
+            // invoice "Ambil dari Projek". Disimpan di JSON `data` dengan
+            // pola yang sama seperti sumberQuotationId - bukan kolom baru.
+            'sumberProjectId' => ['nullable', 'integer'],
         ], [
             'nomor.required' => 'Nomor invoice wajib diisi.',
             'tanggal.required' => 'Tanggal invoice wajib diisi.',
@@ -754,6 +765,9 @@ class SuratController extends Controller
             'nomorPenawaran' => $validated['nomorPenawaran'] ?? null,
             'nomorPo' => $validated['nomorPo'] ?? null,
             'sumberQuotationId' => !empty($validated['sumberQuotationId']) ? (int) $validated['sumberQuotationId'] : null,
+            // ID projek sumber (tb_project.id_project) - JSON `data` saja,
+            // mengikuti pola sumberQuotationId. Tidak ada kolom/migration baru.
+            'sumberProjectId' => !empty($validated['sumberProjectId']) ? (int) $validated['sumberProjectId'] : null,
             'usePPN' => $usePPN,
             'ppnRate' => $usePPN ? $ppnRate : 0,
             'useSignatureStamp' => ($useSignature || $useStamp),
@@ -1000,6 +1014,12 @@ class SuratController extends Controller
             'tanggalSPK' => ['nullable', 'date'],
             'notes' => ['nullable', 'array'],
             'notes.*' => ['string', 'max:1000'],
+            // Sumber invoice untuk surat generik (Surat Jalan, BAST,
+            // Permohonan Pemeriksaan/Pembayaran). Disimpan di JSON `data`
+            // dengan pola yang sama seperti sumberSuratJalanId -
+            // bukan kolom baru, tidak ada migration.
+            'sumberInvoiceId' => ['nullable', 'integer'],
+            'nomorInvoice' => ['nullable', 'string', 'max:100'],
             // Kwitansi tidak punya item; nominal disimpan di kolom `total`.
             'items' => $isKuitansi ? ['nullable', 'array'] : ['required', 'array', 'min:1'],
             'items.*.nama_komponen' => ['required', 'string', 'max:500'],
@@ -1147,6 +1167,10 @@ class SuratController extends Controller
             'nomorPenawaran' => $validated['nomorPenawaran'] ?? null,
             'nomorPO' => $validated['nomorPO'] ?? null,
             'receiverName' => $validated['receiverName'] ?? null,
+            // Sumber invoice (opsional) - JSON `data` saja, mengikuti pola
+            // nomorPenawaran/nomorPO. Tidak ada kolom/migration baru.
+            'sumberInvoiceId' => !empty($validated['sumberInvoiceId']) ? (int) $validated['sumberInvoiceId'] : null,
+            'nomorInvoice' => $validated['nomorInvoice'] ?? null,
             'useSignature' => $useSignature,
             'useStamp' => $useStamp,
             'useSignatureStamp' => ($useSignature || $useStamp),
@@ -1345,6 +1369,10 @@ class SuratController extends Controller
             // Penerima
             'customerName' => ['required', 'string', 'max:255'],
             'customerAddress' => ['required', 'string'],
+            // Opsional: ID client (tb_user) bila penerima diambil
+            // dari data client. Hanya disimpan di JSON `data` untuk
+            // memulihkan pilihan saat edit; bukan kolom baru.
+            'customerId' => ['nullable', 'integer'],
             'systemName' => ['required', 'string', 'max:255'],
             // Perhitungan
             'usePPN' => ['sometimes', 'boolean'],
@@ -1498,6 +1526,9 @@ class SuratController extends Controller
             'subject' => $validated['subject'],
             'customerName' => $validated['customerName'],
             'customerAddress' => $validated['customerAddress'],
+            // ID client (tb_user) bila penerima diambil dari
+            // data client - disimpan di JSON data (bukan kolom baru).
+            'customerId' => !empty($validated['customerId']) ? (int) $validated['customerId'] : null,
             'systemName' => $validated['systemName'],
             'usePPN' => $usePPN,
             'ppnRate' => $usePPN ? $ppnRate : 0,

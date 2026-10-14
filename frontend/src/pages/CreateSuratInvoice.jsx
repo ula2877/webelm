@@ -15,10 +15,12 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input, { Textarea, Select } from '../components/ui/Input';
 import InvoicePreview from '../components/InvoicePreview';
+import ProjectSelect from '../components/ProjectSelect';
 import { ImageAssetField } from './CreateSuratQuotation';
 import { buildPreviewHtml } from '../utils/quotationPrintHtml';
 import { cn } from '../utils/helpers';
 import * as suratService from '../services/surat';
+import { fetchProjectDetail } from '../services/projects';
 import {
   createInitialInvoiceForm,
   emptyItem,
@@ -278,7 +280,27 @@ export default function CreateSuratInvoice() {
           signature: s.id_asset_ttd ?? null,
           stamp: s.id_asset_stempel ?? null,
         });
-        setForm((prev) => ({ ...prev, ...formFromInvoiceDetail(s) }));
+        const mapped = formFromInvoiceDetail(s);
+        setForm((prev) => ({ ...prev, ...mapped }));
+        // Invoice dari Projek: muat label + ringkasan harga/pembayaran
+        // projek agar proyek yang sama tampil terpilih. Read-only fetch
+        // dari data yang tersimpan - invoice lama tidak berubah.
+        if (mapped.sumberSource === 'project' && mapped.sumberProjectId) {
+          fetchProjectDetail(mapped.sumberProjectId)
+            .then((pres) => {
+              if (cancelled || pres?.status !== 'ok' || !pres.data) return;
+              const p = pres.data;
+              setProjectLabel(
+                `${p.judul || p.name || ''}${p.client?.nama ? ` — ${p.client.nama}` : ''}`
+              );
+              setProjectSummary({
+                harga: Number(p.harga) || 0,
+                totalPembayaran: Number(p.total_pembayaran) || 0,
+                pelunasan: p.pelunasan || 'belum_bayar',
+              });
+            })
+            .catch(() => {});
+        }
       })
       .catch((err) => {
         if (!cancelled) setLoadError(err.message || 'Gagal memuat data surat.');
@@ -328,6 +350,13 @@ export default function CreateSuratInvoice() {
     };
   }, []);
 
+  // Ringkasan harga projek & total pembayaran (referensi saja, dihitung
+  // backend dari tb_project + tb_pembayaran). TIDAK pernah membuat/mengubah
+  // transaksi pembayaran projek. `projectLabel` = label projek terpilih
+  // untuk searchable select (dipakai juga saat memuat invoice mode edit).
+  const [projectSummary, setProjectSummary] = useState(null);
+  const [projectLabel, setProjectLabel] = useState('');
+
   // Pilih Surat Penawaran -> isi customer/item/nomorPenawaran tanpa mengubah
   // Surat Penawaran sumbernya.
   const handleSourceQuotationChange = async (id) => {
@@ -360,6 +389,58 @@ export default function CreateSuratInvoice() {
       }
     } catch (err) {
       showNotice('error', err.message || 'Gagal mengambil data surat penawaran.');
+    }
+  };
+
+  // Ganti sumber invoice (Surat Penawaran / Projek). ID sumber lawan
+  // di-reset agar tidak ada keterkaitan ganda yang tersimpan ke invoice.
+  // Nomor penawaran juga dibersihkan saat pindah ke Projek (di alur
+  // quotation field itu terisi otomatis dari penawaran) agar tidak ada
+  // nomor penawaran yang tidak relevan pada invoice dari projek.
+  const handleSourceChange = (source) => {
+    setField('sumberSource', source);
+    if (source === 'project') {
+      setField('sumberQuotationId', null);
+      setField('nomorPenawaran', '');
+    } else {
+      setField('sumberProjectId', null);
+      setProjectSummary(null);
+      setProjectLabel('');
+    }
+  };
+
+  // Pilih Projek -> simpan ID projek sebagai sumber + isi customer
+  // otomatis dari data projek (nama & alamat client). Ringkasan harga
+  // projek & total pembayaran hanya ditampilkan sebagai referensi;
+  // tidak ada transaksi/pelunasan yang dibuat atau diubah di sini.
+  const handleProjectChange = async (id) => {
+    setField('sumberProjectId', id ? Number(id) : null);
+    if (!id) {
+      setProjectSummary(null);
+      setProjectLabel('');
+      return;
+    }
+    try {
+      const res = await fetchProjectDetail(id);
+      if (res?.status === 'ok' && res.data) {
+        const p = res.data;
+        setProjectLabel(
+          `${p.judul || p.name || ''}${p.client?.nama ? ` — ${p.client.nama}` : ''}`
+        );
+        setProjectSummary({
+          harga: Number(p.harga) || 0,
+          totalPembayaran: Number(p.total_pembayaran) || 0,
+          pelunasan: p.pelunasan || 'belum_bayar',
+        });
+        setForm((prev) => ({
+          ...prev,
+          sumberProjectId: Number(id),
+          customerName: p.client?.nama || '',
+          customerAddress: p.client?.alamat || '',
+        }));
+      }
+    } catch (err) {
+      showNotice('error', err.message || 'Gagal mengambil data projek.');
     }
   };
 
@@ -561,30 +642,112 @@ export default function CreateSuratInvoice() {
         <div className="lg:col-span-1 min-w-0 space-y-6">
           {/* 1. Informasi Sumber Invoice */}
           <Section title="Informasi Sumber Invoice">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Select
-                label="Ambil dari Surat Penawaran"
-                value={form.sumberQuotationId || ''}
-                onChange={(e) => handleSourceQuotationChange(e.target.value)}
-              >
-                <option value="">-- Pilih Surat Penawaran (opsional) --</option>
-                {quotationOptions.map((q) => (
-                  <option key={q.id} value={q.id}>{q.nomor}</option>
-                ))}
-              </Select>
-              <Input
-                label="Nomor Penawaran"
-                value={form.nomorPenawaran}
-                onChange={(e) => setField('nomorPenawaran', e.target.value)}
-                placeholder="Masukkan nomor penawaran"
-              />
-              <Input
-                label="Nomor PO/SPK"
-                value={form.nomorPo}
-                onChange={(e) => setField('nomorPo', e.target.value)}
-                placeholder="Masukkan nomor PO/SPK"
-              />
+            {/* Segmented control sumber - pola yang sama dengan "Sumber Data
+                Penerima" pada form Surat Penawaran. */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-text-primary mb-1.5">
+                Sumber Invoice
+              </label>
+              <div className="inline-flex rounded-lg border border-border overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => handleSourceChange('quotation')}
+                  className={cn(
+                    'px-3 py-1.5 text-xs font-medium transition-colors',
+                    form.sumberSource !== 'project'
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-white text-text-secondary hover:bg-gray-50'
+                  )}
+                >
+                  Ambil dari Surat Penawaran
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSourceChange('project')}
+                  className={cn(
+                    'px-3 py-1.5 text-xs font-medium transition-colors border-l border-border',
+                    form.sumberSource === 'project'
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-white text-text-secondary hover:bg-gray-50'
+                  )}
+                >
+                  Ambil dari Projek
+                </button>
+              </div>
+              <p className="mt-1.5 text-xs text-text-muted">
+                {form.sumberSource === 'project'
+                  ? 'Pilih projek terdaftar; nama & alamat customer terisi otomatis dari data projek.'
+                  : 'Pilih surat penawaran; customer, item, dan PPN terisi otomatis dari penawaran.'}
+              </p>
             </div>
+
+            {form.sumberSource === 'project' ? (
+              <div className="space-y-4">
+                <ProjectSelect
+                  label="Projek"
+                  placeholder="Cari nama projek atau customer..."
+                  value={form.sumberProjectId || ''}
+                  onChange={handleProjectChange}
+                  selectedLabel={projectLabel}
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="Nomor PO/SPK"
+                    value={form.nomorPo}
+                    onChange={(e) => setField('nomorPo', e.target.value)}
+                    placeholder="Masukkan nomor PO/SPK"
+                  />
+                </div>
+                {projectSummary && (
+                  <div className="rounded-lg border border-border bg-gray-50/60 p-4 space-y-2 text-sm">
+                    <p className="font-semibold text-text-primary">Ringkasan Projek (referensi)</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-text-secondary">Harga Projek</span>
+                      <span className="font-medium text-text-primary">{rupiah(projectSummary.harga)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-text-secondary">Total Pembayaran Tercatat</span>
+                      <span className="font-medium text-text-primary">{rupiah(projectSummary.totalPembayaran)}</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-border">
+                      <span className="text-text-secondary">Status Pelunasan</span>
+                      <span className="font-medium text-text-primary">
+                        {projectSummary.pelunasan === 'lunas'
+                          ? 'Lunas'
+                          : projectSummary.pelunasan === 'dp'
+                            ? 'Sebagian (DP)'
+                            : 'Belum Bayar'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Select
+                  label="Ambil dari Surat Penawaran"
+                  value={form.sumberQuotationId || ''}
+                  onChange={(e) => handleSourceQuotationChange(e.target.value)}
+                >
+                  <option value="">-- Pilih Surat Penawaran (opsional) --</option>
+                  {quotationOptions.map((q) => (
+                    <option key={q.id} value={q.id}>{q.nomor}</option>
+                  ))}
+                </Select>
+                <Input
+                  label="Nomor Penawaran"
+                  value={form.nomorPenawaran}
+                  onChange={(e) => setField('nomorPenawaran', e.target.value)}
+                  placeholder="Masukkan nomor penawaran"
+                />
+                <Input
+                  label="Nomor PO/SPK"
+                  value={form.nomorPo}
+                  onChange={(e) => setField('nomorPo', e.target.value)}
+                  placeholder="Masukkan nomor PO/SPK"
+                />
+              </div>
+            )}
           </Section>
 
           {/* 2. Informasi Surat */}

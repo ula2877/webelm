@@ -50,6 +50,9 @@ export function createInitialInvoiceForm() {
     nomorPenawaran: '',
     nomorPo: '',
     sumberQuotationId: null,
+    // Sumber invoice: 'quotation' (fitur lama) atau 'project' (dari tb_project).
+    sumberSource: 'quotation',
+    sumberProjectId: null,
     items: [emptyItem()],
     usePPN: true,
     ppnRate: 11,
@@ -95,6 +98,9 @@ export function buildInvoicePayload(form, assetIds = {}) {
     nomorPenawaran: form.nomorPenawaran || '',
     nomorPo: form.nomorPo || '',
     sumberQuotationId: form.sumberQuotationId || null,
+    // ID projek sumber (tb_project.id_project) - disimpan di JSON `data`
+    // tb_surat, pola yang sama dengan sumberQuotationId (bukan kolom baru).
+    sumberProjectId: form.sumberProjectId || null,
     usePPN: !!form.usePPN,
     ppnRate: Number(form.ppnRate) || 0,
     useSignature: !!form.useSignature,
@@ -171,6 +177,10 @@ export function formFromInvoiceDetail(detail) {
     nomorPenawaran: d.nomorPenawaran ?? '',
     nomorPo: d.nomorPo ?? '',
     sumberQuotationId: d.sumberQuotationId ?? null,
+    // Sumber invoice tersimpan: projek bila sumberProjectId ada di JSON
+    // data, selain itu quotation (perilaku lama untuk invoice existing).
+    sumberSource: d.sumberProjectId ? 'project' : 'quotation',
+    sumberProjectId: d.sumberProjectId ?? null,
     usePPN: !!d.usePPN,
     ppnRate: d.ppnRate ?? '',
     notes: Array.isArray(d.notes) && d.notes.length ? d.notes : [''],

@@ -12,6 +12,7 @@ import {
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input, { Textarea, Select } from '../components/ui/Input';
+import InvoiceSelect from '../components/InvoiceSelect';
 import SuratJenisPreview from '../components/SuratJenisPreview';
 import { buildPreviewHtml } from '../utils/quotationPrintHtml';
 import { cn } from '../utils/helpers';
@@ -55,7 +56,7 @@ export default function CreateSuratJenis({ jenisKey }) {
   const cfg = suratJenisConfig(jenisKey);
   const [isLoadingDetail, setIsLoadingDetail] = useState(isEditMode);
   const [loadError, setLoadError] = useState(null);
-  const [form, setForm] = useState({ ...createInitialSuratJenisForm(), sumberQuotationId: null });
+  const [form, setForm] = useState(createInitialSuratJenisForm);
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -66,33 +67,35 @@ export default function CreateSuratJenis({ jenisKey }) {
   // yang dikirim ke backend (id_asset_ttd).
   const [assetIds, setAssetIds] = useState({ signature: null, stamp: null });
 
-  // ---- Surat Jalan: daftar Surat Penawaran untuk "Ambil dari Surat Penawaran" ----
+  // ---- Surat Jalan: daftar Invoice untuk "Ambil dari Invoice" ----
   const isDeliveryNote = jenisKey === 'delivery-note';
-  const [quotations, setQuotations] = useState([]);
-  const [quotationsLoading, setQuotationsLoading] = useState(false);
+  const [invoices, setInvoices] = useState([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
 
   useEffect(() => {
     if (!isDeliveryNote) return undefined;
     let cancelled = false;
-    setQuotationsLoading(true);
+    setInvoicesLoading(true);
     suratService
-      .fetchSurat({ search: '', jenis: 'quotation', page: 1, perPage: 100 })
+      .fetchSurat({ search: '', jenis: 'invoice', page: 1, perPage: 100 })
       .then((res) => {
         if (!cancelled && res?.status === 'ok') {
-          setQuotations(res.data || []);
+          setInvoices(res.data || []);
         }
       })
       .catch(() => {})
       .finally(() => {
-        if (!cancelled) setQuotationsLoading(false);
+        if (!cancelled) setInvoicesLoading(false);
       });
     return () => {
       cancelled = true;
     };
   }, [isDeliveryNote]);
 
-  const handleSourceQuotationChange = async (id) => {
-    setField('sumberQuotationId', id ? Number(id) : null);
+  // Pilih Invoice -> isi nomor invoice, customer, dan item dari invoice
+  // yang tersimpan. Invoice sumber TIDAK diubah.
+  const handleInvoiceChange = async (id) => {
+    setField('sumberInvoiceId', id ? Number(id) : null);
     if (!id) return;
     try {
       const res = await suratService.fetchQuotationDetail(id);
@@ -100,10 +103,14 @@ export default function CreateSuratJenis({ jenisKey }) {
         const d = res.data.data || {};
         setForm((prev) => ({
           ...prev,
-          sumberQuotationId: Number(id),
-          nomorPenawaran: res.data.nomor || '',
+          sumberInvoiceId: Number(id),
+          nomorInvoice: res.data.nomor || '',
           customerName: d.customerName || '',
           customerAddress: d.customerAddress || '',
+          // Nomor penawaran ikut terbawa bila invoice memang berasal dari
+          // penawaran (konsisten dengan data invoice sumber).
+          nomorPenawaran: d.nomorPenawaran || '',
+          nomorPo: d.nomorPo || prev.nomorPo,
           items: Array.isArray(res.data.items) && res.data.items.length
             ? res.data.items.map((it) => ({
                 id: `item-${Math.random().toString(36).slice(2, 9)}`,
@@ -117,7 +124,7 @@ export default function CreateSuratJenis({ jenisKey }) {
         }));
       }
     } catch (err) {
-      showNotice('error', err.message || 'Gagal memuat data Surat Penawaran.');
+      showNotice('error', err.message || 'Gagal memuat data Invoice.');
     }
   };
 
@@ -515,39 +522,24 @@ export default function CreateSuratJenis({ jenisKey }) {
           <div className="lg:col-span-1 min-w-0 space-y-6">
             {/* 0. Informasi Sumber (khusus Surat Jalan) */}
             {isDeliveryNote && (
-              <Section title="Informasi Sumber Surat Jalan">
+              <Section title="Informasi Sumber Invoice">
                 <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-text-primary mb-1.5">
-                      Ambil dari Surat Penawaran
-                    </label>
-                    <select
-                      value={form.sumberQuotationId || ''}
-                      onChange={(e) => handleSourceQuotationChange(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    >
-                      <option value="">-- Pilih Surat Penawaran --</option>
-                      {quotationsLoading ? (
-                        <option disabled>Memuat...</option>
-                      ) : (
-                        quotations.map((q) => (
-                          <option key={q.id} value={q.id}>
-                            {q.nomor} — {q.pengirim || '-'}
-                          </option>
-                        ))
-                      )}
-                    </select>
-                  </div>
+                  <InvoiceSelect
+                    label="Ambil dari Invoice"
+                    placeholder="Cari nomor invoice atau customer..."
+                    value={form.sumberInvoiceId || ''}
+                    onChange={handleInvoiceChange}
+                  />
                   <Input
-                    label="Nomor Penawaran"
-                    value={form.nomorPenawaran}
-                    onChange={(e) => setField('nomorPenawaran', e.target.value)}
-                    placeholder="Nomor surat penawaran (otomatis jika dipilih)"
+                    label="Nomor Invoice"
+                    value={form.nomorInvoice}
+                    onChange={(e) => setField('nomorInvoice', e.target.value)}
+                    placeholder="Terisi otomatis jika invoice dipilih"
                   />
                   <Input
                     label="Nomor PO/SPK"
-                    value={form.nomorPO}
-                    onChange={(e) => setField('nomorPO', e.target.value)}
+                    value={form.nomorPo}
+                    onChange={(e) => setField('nomorPo', e.target.value)}
                     placeholder="Masukkan nomor PO/SPK"
                   />
                 </div>

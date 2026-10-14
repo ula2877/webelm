@@ -170,10 +170,12 @@ export function createInitialBastForm(values = {}) {
     tanggal: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
       d.getDate()
     ).padStart(2, '0')}`,
-    // Sumber dokumen (opsional, diisi dari Surat Jalan).
+    // Sumber dokumen (opsional, diisi dari Invoice).
     sumberSuratJalanId: null,
     nomorSuratJalan: '',
     nomorPenawaran: '',
+    sumberInvoiceId: null,
+    nomorInvoice: '',
     // Informasi berita acara.
     nomorSPK: '',
     tanggalSPK: '',
@@ -239,6 +241,9 @@ export function buildBastPayload(form, assetIds = {}) {
     sumberSuratJalanId: form.sumberSuratJalanId || null,
     nomorSuratJalan: form.nomorSuratJalan || '',
     nomorPenawaran: form.nomorPenawaran || '',
+    // Sumber invoice - JSON `data` saja, pola sama dengan sumberSuratJalanId.
+    sumberInvoiceId: form.sumberInvoiceId || null,
+    nomorInvoice: form.nomorInvoice || '',
     nomorSPK: form.nomorSPK || '',
     tanggalSPK: form.tanggalSPK || '',
     tanggalPelaksanaan: form.tanggalPelaksanaan || '',

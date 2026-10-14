@@ -111,6 +111,9 @@ export function createInitialSuratJenisForm() {
     customerAddress: '',
     nomorPenawaran: '',
     nomorPO: '',
+    // Sumber invoice (opsional, dipilih user dari daftar invoice aktif).
+    sumberInvoiceId: null,
+    nomorInvoice: '',
     receiverName: '',
     items: [emptyItem()],
     notes: [''],
@@ -156,6 +159,10 @@ export function buildSuratJenisPayload(form, assetIds = {}) {
     customerAddress: form.customerAddress || '',
     nomorPenawaran: form.nomorPenawaran || '',
     nomorPO: form.nomorPO || '',
+    // Sumber invoice - disimpan di JSON `data` tb_surat (pola yang sama
+    // dengan nomorPenawaran/nomorPO; bukan kolom baru).
+    sumberInvoiceId: form.sumberInvoiceId || null,
+    nomorInvoice: form.nomorInvoice || '',
     receiverName: form.receiverName || '',
     useSignature: !!form.useSignature,
     signature_asset_id: assetIds.signature || null,
@@ -237,6 +244,8 @@ export function formFromSuratJenisDetail(detail) {
     customerAddress: d.customerAddress ?? '',
     nomorPenawaran: d.nomorPenawaran ?? '',
     nomorPO: d.nomorPO ?? '',
+    sumberInvoiceId: d.sumberInvoiceId ?? null,
+    nomorInvoice: d.nomorInvoice ?? '',
     receiverName: d.receiverName ?? '',
     items:
       Array.isArray(detail.items) && detail.items.length
