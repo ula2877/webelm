@@ -215,7 +215,7 @@ export default function Projek() {
               <input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Cari projek..."
+                placeholder="Cari projek, client, atau nomor HP..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);

@@ -85,8 +85,9 @@ class ProjectController extends Controller
             $query->whereHas('team', fn ($q) => $q->where('id_worker', $userId));
         }
 
-        // Search hits uuid_project, judul, deskripsi AND nama customer
-        // (relasi existing id_client -> tb_user, tanpa tabel baru).
+        // Search hits uuid_project, judul, deskripsi, nama customer,
+        // dan nomor HP customer (relasi existing id_client -> tb_user,
+        // tanpa tabel baru).
         $search = trim((string) $request->query('search', ''));
         if ($search !== '') {
             $like = '%' . $this->escapeLike($search) . '%';
@@ -94,7 +95,8 @@ class ProjectController extends Controller
                 $inner->where('uuid_project', 'like', $like)
                     ->orWhere('judul', 'like', $like)
                     ->orWhere('deskripsi', 'like', $like)
-                    ->orWhereHas('client', fn ($q) => $q->where('nama', 'like', $like));
+                    ->orWhereHas('client', fn ($q) => $q->where('nama', 'like', $like)
+                                            ->orWhere('no_hp', 'like', $like));
             });
         }
 
