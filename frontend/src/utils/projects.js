@@ -87,6 +87,7 @@ export function validateProject(form) {
   }
   if (!String(form.name || '').trim()) errors.name = 'Nama projek wajib diisi.';
   if (!form.id_client) errors.id_client = 'Client wajib dipilih.';
+  if (!String(form.gdrive || '').trim()) errors.gdrive = 'Link Google Drive wajib diisi.';
   if (!String(form.startDate || '').trim()) errors.startDate = 'Tanggal mulai wajib diisi.';
   if (!String(form.estimasiDate || '').trim()) {
     errors.estimasiDate = 'Tanggal estimasi wajib diisi.';
@@ -111,6 +112,7 @@ export function emptyProjectForm() {
     name: '',
     id_client: '',
     description: '',
+    gdrive: '',
     startDate: '',
     estimasiDate: '',
     endDate: '',
@@ -130,6 +132,7 @@ export function formFromProjectDetail(detail) {
     name: d.name || d.judul || '',
     id_client: d.id_client || '',
     description: d.description ?? d.deskripsi ?? '',
+    gdrive: d.gdrive ?? '',
     startDate: d.startDate || d.tanggal_mulai || '',
     estimasiDate: d.estimasiDate || d.tanggal_estimasi || '',
     endDate: d.endDate || d.tanggal_selesai || '',
@@ -150,6 +153,7 @@ export function buildProjectPayload(form) {
     id_client: Number(form.id_client) || null,
     judul: String(form.name || '').trim(),
     deskripsi: String(form.description || ''),
+    gdrive: String(form.gdrive || '').trim(),
     tanggal_mulai: form.startDate || null,
     tanggal_estimasi: form.estimasiDate || null,
     tanggal_selesai: form.endDate || null,

@@ -53,6 +53,7 @@ class Project extends Model
         'urgency',
         'harga',
         'is_proposed',
+        'gdrive',
     ];
 
     protected $casts = [

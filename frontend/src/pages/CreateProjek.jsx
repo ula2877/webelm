@@ -350,6 +350,18 @@ export default function CreateProjek() {
                 />
               </div>
 
+              {/* Link Google Drive */}
+              <div className="sm:col-span-2 lg:col-span-3">
+                <Input
+                  label="Link Google Drive *"
+                  type="url"
+                  value={form.gdrive}
+                  onChange={(e) => setField('gdrive', e.target.value)}
+                  error={errors.gdrive}
+                  placeholder="Masukkan link folder Google Drive projek"
+                />
+              </div>
+
               {/* Deskripsi: WYSIWYG (HTML + upload gambar ke server). */}
               <div className="sm:col-span-2 lg:col-span-3">
                 <ProjectDescriptionEditor

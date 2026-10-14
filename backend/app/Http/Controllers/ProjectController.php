@@ -2057,6 +2057,8 @@ class ProjectController extends Controller
             // Kolom NOT NULL: null/absen disimpan sebagai '' (pola yang sama
             // dipakai UserManagementController untuk foto/id_telegram).
             'deskripsi' => ['nullable', 'string'],
+            // Link Google Drive: wajib, URL valid.
+            'gdrive' => ['required', 'string', 'url'],
             // Kolom tanggal: mulai & estimasi wajib; selesai opsional.
             'tanggal_mulai' => ['required', 'date'],
             'tanggal_estimasi' => ['required', 'date'],
@@ -2077,6 +2079,9 @@ class ProjectController extends Controller
             'judul.required' => 'Judul projek wajib diisi.',
             'judul.max' => 'Judul projek maksimal 500 karakter.',
             'jenis.in' => 'Jenis projek tidak valid.',
+            'deskripsi.required' => 'Deskripsi tidak valid.',
+            'gdrive.required' => 'Link Google Drive wajib diisi.',
+            'gdrive.url' => 'Link Google Drive harus berupa URL yang valid.',
             'tanggal_mulai.required' => 'Tanggal mulai wajib diisi.',
             'tanggal_estimasi.required' => 'Tanggal estimasi wajib diisi.',
             'tanggal_selesai.after_or_equal' => 'Tanggal selesai tidak boleh sebelum tanggal mulai.',
@@ -2107,6 +2112,7 @@ class ProjectController extends Controller
             $project->jenis = $validated['jenis'] ?? self::DEFAULT_JENIS;
         }
         $project->deskripsi = (string) ($validated['deskripsi'] ?? '');
+        $project->gdrive = $validated['gdrive'];
         $project->tanggal_mulai = $validated['tanggal_mulai'];
         $project->tanggal_estimasi = $validated['tanggal_estimasi'];
         // Tanggal selesai opsional: jika tidak diisi, gunakan tanggal estimasi sebagai fallback
@@ -2243,6 +2249,7 @@ class ProjectController extends Controller
             'jenis' => $project->jenis,
             'deskripsi' => (string) $project->deskripsi,
             'description' => (string) $project->deskripsi,
+            'gdrive' => $project->gdrive,
             'tanggal_mulai' => $this->dateOnly($project->tanggal_mulai),
             'startDate' => $this->dateOnly($project->tanggal_mulai),
             'tanggal_estimasi' => $this->dateOnly($project->tanggal_estimasi),
