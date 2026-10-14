@@ -164,6 +164,14 @@ export async function fetchProjectPayments(uuid) {
   return response.data;
 }
 
+// Surat-surat terkait projek: invoice dari projek (sumberProjectId di JSON
+// data) + surat turunan yang sumberInvoiceId-nya merujuk ke invoice tersebut.
+// Backend me-resolve projek dari UUID dan memverifikasi hak akses.
+export async function fetchProjectLetters(uuid) {
+  const response = await api.get(`/api/projects/uuid/${uuid}/letters`);
+  return response.data;
+}
+
 // Tambah transaksi pembayaran + bukti transfer (opsional). bukti berupa File.
 export async function saveProjectPayment(uuid, { pelunasan, nominal, bukti } = {}) {
   const formData = new FormData();

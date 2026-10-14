@@ -32,6 +32,7 @@ import ViewSuratReceipt from './pages/ViewSuratReceipt';
 import Projek from './pages/Projek';
 import CreateProjek from './pages/CreateProjek';
 import ViewProjek from './pages/ViewProjek';
+import ProjectLetters from './pages/ProjectLetters';
 import Profile from './pages/Profile';
 
 function LoadingScreen() {
@@ -134,6 +135,7 @@ function AppRoutes() {
 
         <Route path="/projects" element={<Projek />} />
         <Route path="/projects/:uuid/view" element={<ViewProjek />} />
+        <Route path="/projects/:uuid/letters" element={<ProjectLetters />} />
 
         {/* Create/Edit projek khusus admin. Worker (atau role non-admin lain)
             yang mengetik URL langsung dialihkan ke /dashboard; backend juga

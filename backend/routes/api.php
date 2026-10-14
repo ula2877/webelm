@@ -140,6 +140,12 @@ Route::middleware('auth')->group(function () {
         ->where('uuid', '[a-zA-Z0-9\-]+')
         ->where('progressId', '[0-9]+');
 
+    // Surat-surat terkait projek: invoice dari projek + surat turunan yang
+    // sumberInvoiceId-nya merujuk ke invoice tersebut. Projek di-resolve
+    // dari UUID; kepemilikan diverifikasi di controller (canAccessProject).
+    Route::get('/projects/uuid/{uuid}/letters', [ProjectController::class, 'getLetters'])
+        ->where('uuid', '[a-zA-Z0-9\-]+');
+
     // Unduh SATU file projek berdasarkan id. Worker memakai ini untuk membuka
     // lampiran progress miliknya; kepemilikan projek dicek di controller.
     // Daftar/unggah/hapus file (file manager) tetap KHUSUS ADMIN.

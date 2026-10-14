@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Edit2, User, Users, Calendar, DollarSign, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Edit2, User, Users, Calendar, DollarSign, AlertTriangle, FileText } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -304,12 +304,23 @@ export default function ViewProjek() {
         <div className="space-y-6">
           {/* Informasi Project */}
           <Card>
-            <h3 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
-              <span className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
-                <AlertTriangle className="w-4 h-4 text-primary-600" />
-              </span>
-              Informasi Project
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+                <span className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4 text-primary-600" />
+                </span>
+                Informasi Project
+              </h3>
+              <Button
+                type="button"
+                variant="outline"
+                icon={FileText}
+                onClick={() => navigate(`/projects/${project.uuid}/letters`)}
+                className="whitespace-nowrap"
+              >
+                Surat-Surat
+              </Button>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Tanggal Mulai</p>

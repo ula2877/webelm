@@ -1297,6 +1297,140 @@ class ProjectController extends Controller
     }
 
     /**
+     * GET /api/projects/uuid/{uuid}/letters
+     *
+     * Semua dokumen terkait projek dalam satu respons:
+     *  - invoices : invoice yang sumberProjectId = projek ini (JSON `data`
+     *               tb_surat, lihat SuratController::saveInvoice).
+     *  - related  : surat lain (delivery-note, bast, inspection-request,
+     *               payment-request, kuitansi) yang sumberInvoiceId-nya
+     *               merujuk ke invoice di atas (JSON `data`, lihat
+     *               SuratController::saveSuratJenis).
+     *
+     * Projek selalu di-resolve dari uuid_project; id_project tidak pernah
+     * diterima dari client. Kepemilikan diverifikasi via canAccessProject
+     * (worker hanya melihat projek yang ditugaskan via tb_tim). Tidak ada
+     * kolom/migration baru - kedua relasi disimpan di JSON `data` yang
+     * sudah ada. Satu surat hanya punya satu sumberInvoiceId, jadi tidak
+     * mungkin ada duplikat lintas jalur relasi.
+     */
+    public function getLetters(string $uuid): JsonResponse
+    {
+        $project = Project::where('uuid_project', $uuid)->first();
+
+        if (!$project || !$this->canAccessProject($project)) {
+            return $this->notFound();
+        }
+
+        $projectId = (int) $project->id_project;
+
+        // A. Invoice dari projek: sumberProjectId di JSON `data`.
+        $invoiceRows = DB::table('tb_surat')
+            ->where('jenis', 'invoice')
+            ->whereNull('deleted_at')
+            ->whereRaw('JSON_UNQUOTE(JSON_EXTRACT(data, \'$.sumberProjectId\')) = ?', [$projectId])
+            ->orderByDesc('tanggal')
+            ->orderByDesc('id_surat')
+            ->get();
+
+        $invoiceIds = $invoiceRows->pluck('id_surat')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        // B. Surat turunan: sumberInvoiceId merujuk ke invoice di atas.
+        //    hanya jenis surat yang memang punya relasi sumber invoice.
+        //    $invoiceIds sudah berupa integer (di-cast), jadi whereRaw di
+        //    bawah aman dari SQL injection.
+        $relatedRows = [];
+        if (!empty($invoiceIds)) {
+            $placeholders = implode(',', array_fill(0, count($invoiceIds), '?'));
+            $relatedRows = DB::table('tb_surat')
+                ->whereIn('jenis', ['delivery-note', 'bast', 'inspection-request', 'payment-request', 'kuitansi'])
+                ->whereNull('deleted_at')
+                ->whereRaw(
+                    "JSON_UNQUOTE(JSON_EXTRACT(data, '$.sumberInvoiceId')) IN ($placeholders)",
+                    $invoiceIds
+                )
+                ->orderByDesc('tanggal')
+                ->orderByDesc('id_surat')
+                ->get();
+        }
+
+        return response()->json([
+            'status' => 'ok',
+            'data' => [
+                'invoices' => $invoiceRows
+                    ->map(fn ($row) => $this->presentLetter($row, $projectId))
+                    ->all(),
+                'related' => $relatedRows
+                    ->map(fn ($row) => $this->presentLetter($row, $projectId))
+                    ->all(),
+            ],
+        ], 200);
+    }
+
+    /**
+     * Present one tb_surat row for the project letters page.
+     * Mirrors SuratController::present() but keeps it local to avoid cross-controller coupling.
+     * Returns the same field set used by the surat list API.
+     */
+    private function presentSurat(object $row): array
+    {
+        $data = json_decode((string) $row->data, true) ?? [];
+
+        $perihal = $data['subject'] ?? $data['perihal'] ?? '-';
+        $pengirim = $data['customerName'] ?? $data['pengirim'] ?? '-';
+        $nomorInvoice = $data['nomorInvoice'] ?? null;
+        $status = $data['status'] ?? ($row->deleted_at ? 'Dihapus' : 'Aktif');
+
+        $statusVariant = match (true) {
+            stripos($status, 'dibaca') !== false => 'success',
+            stripos($status, 'belum') !== false => 'warning',
+            stripos($status, 'dihapus') !== false => 'danger',
+            default => 'default',
+        };
+
+        return [
+            'id' => (int) $row->id_surat,
+            'uuid' => $row->uuid_surat,
+            'nomor' => $row->nomor,
+            'jenis' => $row->jenis,
+            'tanggal' => $row->tanggal,
+            'perihal' => $perihal,
+            'pengirim' => $pengirim,
+            'nomorInvoice' => $nomorInvoice,
+            'status' => $status,
+            'status_variant' => $statusVariant,
+            'total' => (int) ($row->total ?? 0),
+            'created_at' => $row->created_at,
+            'updated_at' => $row->updated_at,
+        ];
+    }
+
+    /**
+     * Satu baris tb_surat untuk halaman Surat-Surat Projek: presentSurat()
+     * (kolom list) + field sumber invoice/projek dari JSON `data` agar
+     * frontend bisa menampilkan nomor sumber dan menautkan ke view.
+     */
+    private function presentLetter(object $row, int $projectId): array
+    {
+        $data = json_decode((string) $row->data, true);
+        if (!is_array($data)) {
+            $data = [];
+        }
+
+        $payload = $this->presentSurat($row);
+        $payload['sumberInvoiceId'] = isset($data['sumberInvoiceId'])
+            ? (int) $data['sumberInvoiceId']
+            : null;
+        $payload['nomorInvoice'] = $data['nomorInvoice'] ?? null;
+        $payload['sumberProjectId'] = (int) ($data['sumberProjectId'] ?? 0) === $projectId
+            ? $projectId
+            : null;
+        return $payload;
+    }
+
+    /**
      * GET /api/projects/uuid/{uuid}/pembayaran
      *
      * Ringkasan keuangan + seluruh riwayat transaksi tb_pembayaran milik satu
