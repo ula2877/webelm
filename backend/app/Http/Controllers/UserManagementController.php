@@ -72,7 +72,9 @@ class UserManagementController extends Controller
             $like = '%' . $this->escapeLike($search) . '%';
             $query->where(function ($inner) use ($like) {
                 $inner->where('username', 'like', $like)
-                    ->orWhere('nama', 'like', $like);
+                    ->orWhere('nama', 'like', $like)
+                    ->orWhere('no_hp', 'like', $like)
+                    ->orWhere('alamat', 'like', $like);
             });
         }
 
@@ -166,7 +168,9 @@ class UserManagementController extends Controller
             $like = '%' . $this->escapeLike($search) . '%';
             $query->where(function ($inner) use ($like) {
                 $inner->where('username', 'like', $like)
-                    ->orWhere('nama', 'like', $like);
+                    ->orWhere('nama', 'like', $like)
+                    ->orWhere('no_hp', 'like', $like)
+                    ->orWhere('alamat', 'like', $like);
             });
         }
 

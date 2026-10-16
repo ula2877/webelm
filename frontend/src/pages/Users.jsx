@@ -276,7 +276,7 @@ export default function Users() {
               <input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Search users..."
+                placeholder="Cari nama, username, nomor HP, atau alamat..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                 className="w-full pl-10 pr-4 py-2.5 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
