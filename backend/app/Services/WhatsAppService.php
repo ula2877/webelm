@@ -37,6 +37,16 @@ class WhatsAppService
             return false;
         }
 
+        // Debug: log payload sebelum dikirim ke API WhatsApp (tanpa API key)
+        Log::debug('Debug payload WhatsApp Progress', [
+            'number' => $number,
+            'message' => $message,
+            'fileUrls' => array_values(array_filter(
+                $fileUrls,
+                fn ($u) => is_string($u) && trim($u) !== ''
+            )),
+        ]);
+
         try {
             $payload = [
                 'number' => $number,
