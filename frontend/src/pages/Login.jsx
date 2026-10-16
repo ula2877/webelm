@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Eye, EyeOff, ArrowRight, CheckCircle } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -11,7 +11,6 @@ export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const { login, isLoading, error } = useAuth();
   const navigate = useNavigate();
 
@@ -35,7 +34,7 @@ export default function Login() {
           <div className="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl" />
         </div>
 
-        <div className="relative z-10">
+        <div className="relative z-10 flex flex-1 items-center justify-center">
           <div className="flex items-center gap-3">
             <img
               src={logoElmech}
@@ -43,25 +42,6 @@ export default function Login() {
               className="w-10 h-10 object-contain"
             />
             <span className="text-2xl font-bold text-white">ELMECH</span>
-          </div>
-        </div>
-
-        <div className="relative z-10">
-          <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-6">
-            Welcome to your
-            <br />
-            <span className="text-primary-200">enterprise dashboard</span>
-          </h1>
-          <p className="text-lg text-primary-100 mb-8 max-w-md">
-            Manage your business operations, track performance, and make data-driven decisions with our comprehensive platform.
-          </p>
-          <div className="space-y-4">
-            {['Real-time analytics and reporting', 'Team collaboration tools', 'Enterprise-grade security'].map((feature) => (
-              <div key={feature} className="flex items-center gap-3">
-                <CheckCircle className="w-5 h-5 text-primary-200" />
-                <span className="text-primary-100">{feature}</span>
-              </div>
-            ))}
           </div>
         </div>
 
@@ -130,21 +110,6 @@ export default function Login() {
               </button>
             </div>
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-border text-primary-600 focus:ring-primary-500"
-                />
-                <span className="text-sm text-text-secondary">Remember me</span>
-              </label>
-              <a href="#" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
-                Forgot password?
-              </a>
-            </div>
-
             <Button
               type="submit"
               className="w-full"
@@ -156,23 +121,6 @@ export default function Login() {
               Sign in
             </Button>
           </form>
-
-          <div className="mt-8 text-center">
-            <p className="text-sm text-text-secondary">
-              Don&apos;t have an account?{' '}
-              <a href="#" className="text-primary-600 hover:text-primary-700 font-medium">
-                Sign up
-              </a>
-            </p>
-          </div>
-
-          <div className="mt-8 p-4 bg-gray-50 rounded-lg border border-border">
-            <p className="text-xs text-text-muted text-center">
-              <span className="font-medium text-text-secondary">Access restricted.</span>
-              <br />
-              Sign in with an active ELMECH account.
-            </p>
-          </div>
         </div>
       </div>
     </div>
