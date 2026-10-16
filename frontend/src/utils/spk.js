@@ -43,14 +43,21 @@ export function pickPenanggungJawab(workers) {
  * Nilai kosong atau belum diisi tampil '-' tanpa error.
  */
 export function buildSpkInfoRows(project) {
-  const penanggung = pickPenanggungJawab(project.workers);
-  const ownerName = project.client?.nama ? String(project.client.nama) : null;
+  // `project` adalah objek FORM yang dibangun oleh buildSpkForm() (lihat
+  // bagian bawah), yang sudah berisi nilai yang telah diproses:
+  //   title / penanggungJawab / tanggalMulai / tanggalSelesai / owner.
+  // Untuk aman, tetap menerima bentuk raw project sebagai fallback.
+  const penanggung = project.penanggungJawab ?? pickPenanggungJawab(project.workers);
+  const ownerName = project.owner ?? project.client?.nama ?? null;
+  const projectName = project.title ?? project.judul ?? null;
+  const mulai = project.tanggalMulai ?? project.tanggal_mulai;
+  const selesai = project.tanggalSelesai ?? project.tanggal_selesai;
 
   return [
     { label: 'Penanggung Jawab', colon: ':', value: penanggung ?? '-' },
-    { label: 'Tanggal Mulai', colon: ':', value: formatTanggal(project.tanggal_mulai) },
-    { label: 'Tanggal Selesai', colon: ':', value: formatTanggal(project.tanggal_selesai) },
-    { label: 'Nama Proyek', colon: ':', value: project.judul || '-' },
+    { label: 'Tanggal Mulai', colon: ':', value: formatTanggal(mulai) },
+    { label: 'Tanggal Selesai', colon: ':', value: formatTanggal(selesai) },
+    { label: 'Nama Proyek', colon: ':', value: projectName ?? '-' },
     { label: 'Owner', colon: ':', value: ownerName ?? '-' },
   ];
 }
