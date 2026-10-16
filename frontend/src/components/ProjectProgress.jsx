@@ -329,25 +329,6 @@ export default function ProjectProgress({ uuid }) {
     setUploadPercent(null);
 
     try {
-      // Debug: data yang akan dikirim ke backend (form Tambah Progress)
-      // Catatan: nomor WA, pesan, dan URL lampiran final dihitung backend
-      // berdasarkan data projek & tb_files setelah upload.
-      try {
-        const fileDebug = selectedFiles.map((item) => ({
-          name: item.file?.name,
-          size: item.file?.size,
-          type: item.file?.type,
-        }));
-        console.group('Debug WhatsApp Progress (frontend - sebelum request)');
-        console.log('Progress:', clampProgress(progressValue), '%');
-        console.log('Deskripsi (trimmed):', trimmed);
-        console.log('Jumlah file terpilih:', selectedFiles.length);
-        console.log('File info:', fileDebug);
-        console.groupEnd();
-      } catch (e) {
-        // swallow
-      }
-
       const response = await projectService.saveProjectProgress(uuid, {
         progress: clampProgress(progressValue),
         deskripsi: trimmed,

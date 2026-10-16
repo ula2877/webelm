@@ -1144,13 +1144,7 @@ class ProjectController extends Controller
             $deskripsi
         );
 
-        // Debug: log data yang akan dikirim ke layanan WhatsApp
-        Log::debug('Debug WhatsApp Progress (controller)', [
-            'id_project' => (int) $project->id_project,
-            'number' => $number,
-            'message' => $message,
-            'fileUrls' => $fileUrls,
-        ]);
+
 
         $sent = WhatsAppService::sendWA($number, $message, $fileUrls);
 
