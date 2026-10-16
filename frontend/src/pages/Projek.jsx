@@ -163,8 +163,8 @@ export default function Projek() {
 
   // Bangun form SPK dari detail projek yang sudah di-resolve backend dari
   // UUID (lihat buildSpkForm di utils/spk.js).
-  const buildSpkFormFromDetail = async (detail) =>
-    buildSpkForm(detail.data, await loadSpkSignatureAssets());
+  const buildSpkFormFromDetail = async (projectData) =>
+    buildSpkForm(projectData, await loadSpkSignatureAssets());
 
   // Unduh SPK: ambil detail projek via UUID -> bangun form -> render preview
   // di belakang layar -> serialize -> POST ke mekanisme PDF yang sudah ada.
