@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FileText, Plus, Search, RotateCcw, Eye, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { FileText, Plus, Search, RotateCcw, Eye, Pencil, Trash2, Loader2, Download } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -10,9 +10,13 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
 import SortableHeader from '../components/ui/SortableHeader';
 import useTableSort from '../hooks/useTableSort';
 import * as projectService from '../services/projects';
+import * as suratService from '../services/surat';
 import { useAuth } from '../context/AuthContext';
 import { isAdmin } from '../utils/roles';
 import { rupiah } from '../utils/suratJenis';
+import { buildPreviewHtml } from '../utils/quotationPrintHtml';
+import { buildSpkForm } from '../utils/spk';
+import SpkPreview from '../components/SpkPreview';
 import {
   PROJECT_PELUNASAN_FILTER,
   PROJECT_PELUNASAN_VARIANT,
@@ -55,6 +59,10 @@ export default function Projek() {
   const [notice, setNotice] = useState(location.state?.notice || null);
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, item: null });
   const [deleteBusy, setDeleteBusy] = useState(false);
+  // SPK (Surat Perintah Kerja) preview yang sedang dirender di belakang layar
+  // untuk mengambil PDF. null = tidak aktif.
+  const [spkForm, setSpkForm] = useState(null);
+  const [isGeneratingSpk, setIsGeneratingSpk] = useState(false);
   const { sort, toggleSort, resetSort, sortParams } = useTableSort();
 
   const searchInputRef = useRef(null);
@@ -139,6 +147,81 @@ export default function Projek() {
   const handleView = (uuid) => {
     navigate(`/projects/${uuid}/view`);
   };
+
+  // Ambil asset signature/stamp terbaru yang tersimpan (lihat
+  // fetchSuratAssets). Asset khusus jenis SPK tidak ada, sehingga modul ini
+  // memakai aset terbaru yang tersedia - pola yang sama dengan modul surat
+  // lain yang memakai asset default.
+  const loadSpkSignatureAssets = async () => {
+    const signature = await suratService.fetchSuratAssets('signature');
+    const stamp = await suratService.fetchSuratAssets('stamp');
+    return {
+      signatureImage: signature?.[0]?.url ?? null,
+      stampImage: stamp?.[0]?.url ?? null,
+    };
+  };
+
+  // Bangun form SPK dari detail projek yang sudah di-resolve backend dari
+  // UUID (lihat buildSpkForm di utils/spk.js).
+  const buildSpkFormFromDetail = async (detail) =>
+    buildSpkForm(detail.data, await loadSpkSignatureAssets());
+
+  // Unduh SPK: ambil detail projek via UUID -> bangun form -> render preview
+  // di belakang layar -> serialize -> POST ke mekanisme PDF yang sudah ada.
+  const handleDownloadSpk = async (project) => {
+    if (isGeneratingSpk) return;
+    setIsGeneratingSpk(true);
+    try {
+      const res = await projectService.fetchProjectDetailByUuid(project.uuid);
+      if (res?.status !== 'ok' || !res.data) {
+        throw new Error('Gagal mengambil data projek.');
+      }
+      const form = await buildSpkFormFromDetail(res.data);
+      setSpkForm(form);
+    } catch (err) {
+      showNoticeRef.current('error', err.message || 'Gagal menyiapkan dokumen SPK.');
+      setIsGeneratingSpk(false);
+    }
+  };
+
+  // Render preview + unduh PDF. Pola sama halaman Surat lainnya: tunggu
+  // layout measurement, serialize HTML, POST ke pdfFromHtml, download blob.
+  useEffect(() => {
+    if (!spkForm) return undefined;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        await document.fonts?.ready;
+        // Beri waktu SpkPreview mengukur blok sebelum serialize.
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        if (cancelled) return;
+        const html = await buildPreviewHtml();
+        const blob = await suratService.downloadQuotationPdfFromHtml(html);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Surat-Perintah-Kerja-${spkForm.title.replace(/[\\/:*?"<>|]+/g, '_')}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showNoticeRef.current('success', 'SPK berhasil diunduh.');
+      } catch (err) {
+        if (!cancelled) {
+          showNoticeRef.current('error', err.message || 'Gagal membuat PDF SPK.');
+        }
+      } finally {
+        if (!cancelled) {
+          setSpkForm(null);
+          setIsGeneratingSpk(false);
+        }
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [spkForm]);
 
   // Hard delete via API (row benar-benar hilang dari tb_project).
   const handleDeleteConfirm = async () => {
@@ -361,6 +444,18 @@ export default function Projek() {
                             <>
                               <button
                                 className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                                title="Unduh SPK"
+                                onClick={() => handleDownloadSpk(p)}
+                                disabled={isGeneratingSpk}
+                              >
+                                {isGeneratingSpk ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Download className="w-4 h-4" />
+                                )}
+                              </button>
+                              <button
+                                className="p-2 rounded-lg text-text-muted hover:text-primary-600 hover:bg-primary-50 transition-colors"
                                 title="Edit"
                                 onClick={() => navigate(`/${CFG.routeBase}/${p.uuid}/edit`)}
                               >
@@ -382,6 +477,14 @@ export default function Projek() {
                 </tbody>
               </table>
             </div>
+            {spkForm && (
+              <div
+                style={{ position: 'absolute', left: -10000, top: 0 }}
+                aria-hidden="true"
+              >
+                <SpkPreview project={spkForm} />
+              </div>
+            )}
             <div className="px-6 py-4 border-t border-border">
               <Pagination
                 currentPage={currentPage}

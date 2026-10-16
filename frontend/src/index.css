@@ -1197,6 +1197,79 @@ body {
 }
 
 /* ==========================================================================
+   SPK - Surat Perintah Kerja
+   Struktur & urutan mengikuti pola surat lain (lihat BastPreview):
+     judul (center) -> tabel informasi (3 kolom) -> detail pekerjaan ->
+     tanda tangan ("Mengetahui,").
+   Hanya class yang unik untuk SPK; header/footer mengandalkan class
+   .letter-* yang sudah dipakai semua modul surat.
+   ========================================================================== */
+
+.spk-title-block {
+  text-align: center;
+  margin-bottom: 3mm;
+}
+.spk-title {
+  font-size: 18pt;
+  font-weight: 700;
+  letter-spacing: 4px;
+  margin: 0 0 2mm;
+}
+
+/* Tabel informasi: 3 kolom (Keterangan | : | Data). */
+.spk-info-table {
+  margin: 2mm 0;
+}
+.spk-info-table td {
+  font-size: 10pt;
+  line-height: 1.45;
+}
+.col-spk-label {
+  width: 34%;
+  font-weight: 700;
+}
+.col-spk-colon {
+  width: 7%;
+  text-align: center;
+}
+.col-spk-value {
+  width: 59%;
+  word-break: break-word;
+}
+
+/* Detail pekerjaan: HTML deskripsi WYSIWYG disisipkan apa adanya. */
+.spk-detail-heading {
+  font-size: 11pt;
+  font-weight: 700;
+  margin: 0 0 1.5mm;
+}
+.spk-detail-content {
+  font-size: 10pt;
+  line-height: 1.45;
+}
+.spk-detail-content > *:first-child {
+  margin-top: 0;
+}
+.spk-detail-content > *:last-child {
+  margin-bottom: 0;
+}
+.spk-detail-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Tanda tangan: teks "Mengetahui," di kanan bawah, mengikuti pola surat
+   lain (.letter-signature) bila tersedia. */
+.spk-sig-mengetahui {
+  text-align: right;
+  font-size: 10pt;
+  margin: 0 8mm 1mm 0;
+}
+.spk-signature .letter-signature-box img {
+  max-height: 22mm;
+}
+
+/* ==========================================================================
    Print
    ========================================================================== */
 @page {
