@@ -31,4 +31,20 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp Notification Service (ELMECH)
+    |--------------------------------------------------------------------------
+    |
+    | Endpoint & API key untuk layanan notifikasi WhatsApp. Kredensial
+    | diambil dari environment - JANGAN hardcode di controller/frontend.
+    |
+    */
+
+    'whatsapp' => [
+        'url' => env('WHATSAPP_API_URL', 'https://wa-bot.elmechtechnology.com/api/send-notif'),
+        'api_key' => env('WHATSAPP_API_KEY', ''),
+        'timeout' => (int) env('WHATSAPP_API_TIMEOUT', 10),
+    ],
+
 ];

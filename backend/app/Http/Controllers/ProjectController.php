@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\User;
+use App\Services\WhatsAppService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -1092,11 +1094,173 @@ class ProjectController extends Controller
             'id_file' => $idFileJson,
         ];
 
+        // Notifikasi WhatsApp ke customer pemilik projek. Dijalankan SETELAH
+        // commit sehingga kegagalan pengiriman tidak pernah membatalkan atau
+        // menghapus progress yang sudah tersimpan. Hasilnya dilaporkan
+        // terpisah pada field `whatsapp` (tidak mengubah bentuk `data`).
+        $whatsapp = $this->sendProgressWhatsApp($project, $progress, $deskripsi, $fileIds);
+
         return response()->json([
             'status' => 'ok',
             'message' => 'Progress berhasil disimpan.',
+            'whatsapp' => $whatsapp,
             'data' => $this->presentProgress($row, (int) $project->id_project, $disk),
         ], 201);
+    }
+
+    /**
+     * Kirim notifikasi WhatsApp atas satu catatan progress ke customer
+     * (tb_user pemilik projek via tb_project.id_client).
+     *
+     * Selalu mengembalikan status terstruktur dan TIDAK pernah melempar
+     * exception, supaya penyimpanan progress tidak terpengaruh:
+     *   ['sent' => bool, 'skipped' => bool, 'reason' => ?string]
+     *
+     * @param  int[] $fileIds ID tb_files lampiran progress ini (boleh kosong).
+     * @return array{sent:bool, skipped:bool, reason:?string}
+     */
+    private function sendProgressWhatsApp(Project $project, int $progress, string $deskripsi, array $fileIds): array
+    {
+        $client = $project->client;
+        $number = $this->normalizeWhatsAppNumber($client?->no_hp);
+
+        if ($number === null) {
+            Log::warning('Notifikasi WhatsApp progress dilewati: nomor HP customer tidak valid.', [
+                'id_project' => (int) $project->id_project,
+            ]);
+
+            return [
+                'sent' => false,
+                'skipped' => true,
+                'reason' => 'Nomor HP customer tidak tersedia atau tidak valid.',
+            ];
+        }
+
+        $fileUrls = $this->progressWhatsAppFileUrls($fileIds, (int) $project->id_project);
+        $message = $this->buildProgressWhatsAppMessage(
+            $client?->nama,
+            $project->judul,
+            $progress,
+            $deskripsi
+        );
+
+        $sent = WhatsAppService::sendWA($number, $message, $fileUrls);
+
+        return [
+            'sent' => $sent,
+            'skipped' => false,
+            'reason' => $sent ? null : 'Gagal mengirim notifikasi WhatsApp.',
+        ];
+    }
+
+    /**
+     * Normalisasi nomor HP customer ke format internasional Indonesia tanpa
+     * tanda baca (mis. "0812-3456-7890" -> "6281234567890").
+     *
+     * Mengembalikan null bila nomor kosong / tidak dapat dinormalisasi ke
+     * nomor Indonesia yang wajar (dipakai untuk MELEWATI pengiriman).
+     */
+    private function normalizeWhatsAppNumber(?string $value): ?string
+    {
+        $digits = preg_replace('/[^0-9]/', '', (string) $value);
+        if ($digits === '') {
+            return null;
+        }
+
+        if (str_starts_with($digits, '0')) {
+            // 0812... -> 62812...
+            $digits = '62' . substr($digits, 1);
+        } elseif (str_starts_with($digits, '8')) {
+            // 812... -> 62812...
+            $digits = '62' . $digits;
+        }
+
+        // Hanya terima nomor Indonesia (kode negara 62).
+        if (!str_starts_with($digits, '62')) {
+            return null;
+        }
+
+        // Panjang wajar nomor seluler Indonesia: 62 + 8..13 digit.
+        $length = strlen($digits);
+        if ($length < 10 || $length > 16) {
+            return null;
+        }
+
+        return $digits;
+    }
+
+    /**
+     * URL lampiran absolut untuk field `fileUrls`.
+     *
+     * tb_files.path sudah menyimpan FULL URL (lihat addProgress ->
+     * publicFileUrl()). Hanya URL http(s) milik projek ini yang dikirim -
+     * path filesystem lokal tidak pernah diteruskan.
+     *
+     * @param  int[] $fileIds
+     * @return string[]
+     */
+    private function progressWhatsAppFileUrls(array $fileIds, int $projectId): array
+    {
+        if (empty($fileIds)) {
+            return [];
+        }
+
+        $rows = DB::table('tb_files')
+            ->whereIn('id', $fileIds)
+            ->where('id_parent', $projectId)
+            ->pluck('path');
+
+        $urls = [];
+        foreach ($rows as $path) {
+            $value = trim((string) $path);
+            // Hanya URL absolut yang bisa diakses layanan WhatsApp.
+            if ($value !== '' && preg_match('#^https?://#i', $value)) {
+                $urls[] = $value;
+            }
+        }
+
+        return array_values(array_unique($urls));
+    }
+
+    /**
+     * Susun isi pesan notifikasi progress. Deskripsi bisa berupa HTML (dari
+     * editor) sehingga diubah dulu menjadi teks biasa yang mudah dibaca.
+     */
+    private function buildProgressWhatsAppMessage(
+        ?string $customerName,
+        ?string $projectName,
+        int $progress,
+        string $deskripsi
+    ): string {
+        $name = trim((string) $customerName);
+        $project = trim((string) $projectName);
+        $plainDeskripsi = $this->htmlToPlainText($deskripsi);
+
+        return "*Update Progress Projek*\n\n"
+            . 'Halo ' . ($name !== '' ? $name : 'Bapak/Ibu') . ",\n\n"
+            . "Berikut pembaruan progress untuk projek Anda:\n\n"
+            . '*Nama Projek:* ' . ($project !== '' ? $project : '-') . "\n"
+            . '*Progress:* ' . $progress . "%\n"
+            . "*Deskripsi:*\n"
+            . ($plainDeskripsi !== '' ? $plainDeskripsi : '-') . "\n\n"
+            . "Terima kasih.\nELMECH";
+    }
+
+    /**
+     * Ubah HTML deskripsi menjadi teks biasa untuk pesan WhatsApp:
+     * blok/baris menjadi newline, tag dibuang, entitas didekode, dan
+     * spasi/newline berlebih dirapikan.
+     */
+    private function htmlToPlainText(string $html): string
+    {
+        // Pertahankan jeda baris dari tag blok sebelum tag dibuang.
+        $withBreaks = preg_replace('#<(br|/p|/div|/li|/h[1-6]|/tr)\s*/?>#i', "\n", $html);
+        $text = html_entity_decode(strip_tags((string) $withBreaks), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = str_replace("\xc2\xa0", ' ', $text); // &nbsp;
+        $text = preg_replace('/[ \t]+/', ' ', (string) $text);
+        $text = preg_replace('/\n{3,}/', "\n\n", (string) $text);
+
+        return trim((string) $text);
     }
 
     /**

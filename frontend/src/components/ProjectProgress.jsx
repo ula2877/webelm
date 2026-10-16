@@ -335,10 +335,26 @@ export default function ProjectProgress({ uuid }) {
         files: selectedFiles.map((item) => item.file),
         onProgress: (percent) => setUploadPercent(percent),
       });
-      setNotice({
-        type: 'success',
-        message: response.message || 'Progress berhasil disimpan.',
-      });
+
+      // Progress sudah tersimpan. Status pengiriman WhatsApp dilaporkan
+      // terpisah: kegagalan WA tidak mengubah keberhasilan penyimpanan.
+      const baseMessage = response.message || 'Progress berhasil disimpan.';
+      const wa = response.whatsapp;
+      if (wa && wa.sent === true) {
+        setNotice({
+          type: 'success',
+          message: `${baseMessage} Notifikasi WhatsApp terkirim ke customer.`,
+        });
+      } else if (wa && wa.sent === false) {
+        setNotice({
+          type: 'warning',
+          message: `${baseMessage} Namun notifikasi WhatsApp tidak terkirim (${
+            wa.reason || 'gagal dikirim'
+          }).`,
+        });
+      } else {
+        setNotice({ type: 'success', message: baseMessage });
+      }
       setIsModalOpen(false);
       clearFiles();
       setDeskripsi('');
@@ -455,6 +471,8 @@ export default function ProjectProgress({ uuid }) {
             className={`flex items-start gap-3 p-3 mb-4 rounded-lg border text-sm ${
               notice.type === 'success'
                 ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : notice.type === 'warning'
+                ? 'bg-amber-50 border-amber-200 text-amber-800'
                 : 'bg-red-50 border-red-200 text-red-800'
             }`}
             role="status"
