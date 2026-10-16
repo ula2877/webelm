@@ -49,13 +49,6 @@ export default function SpkPreview({ project }) {
 
   const renderInfo = () => (
     <table className="letter-table spk-info-table" data-mtable="true">
-      <thead>
-        <tr>
-          <th className="col-spk-label">Keterangan</th>
-          <th className="col-spk-colon">:</th>
-          <th className="col-spk-value">Data</th>
-        </tr>
-      </thead>
       <tbody>
         {buildSpkInfoRows(project).map((row) => (
           <tr key={row.label}>
