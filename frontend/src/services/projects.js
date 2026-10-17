@@ -10,6 +10,7 @@ export async function fetchProjects(
     jenis = '',
     urgency = '',
     pelunasan = '',
+    proposed = '',
     page = 1,
     perPage = 6,
     sortBy = '',
@@ -23,6 +24,7 @@ export async function fetchProjects(
       jenis,
       urgency,
       pelunasan,
+      proposed,
       page,
       per_page: perPage,
       // Sorting server-side (whitelist di backend). Kosong = urutan default.

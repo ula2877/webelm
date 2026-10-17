@@ -57,7 +57,7 @@ class ProjectController extends Controller
 
     /**
      * GET /api/projects
-     * ?search=&status=&jenis=&urgency=&pelunasan=&page=&per_page=
+     * ?search=&status=&jenis=&urgency=&pelunasan=&proposed=&page=&per_page=
      */
     public function index(Request $request): JsonResponse
     {
@@ -151,6 +151,23 @@ class ProjectController extends Controller
                 ]);
             }
             $query->where('jenis', $jenis);
+        }
+
+        // Filter Ajuan / Tidak Ajuan memakai kolom existing
+        // tb_project.is_proposed (tinyint(1) NOT NULL DEFAULT 0):
+        //   ajuan       = is_proposed = 1 (sudah diajukan).
+        //   tidak_ajuan = is_proposed = 0 (belum diajukan).
+        // Kosong / 'all' = Semua Ajuan (tanpa filter). Diterapkan pada query
+        // dasar, sehingga ikut menggabung dengan search, pelunasan, urgency,
+        // status, jenis, pembatasan role, sorting, dan pagination.
+        $proposed = $request->query('proposed');
+        if ($proposed !== null && $proposed !== '' && $proposed !== 'all') {
+            if (!in_array($proposed, ['ajuan', 'tidak_ajuan'], true)) {
+                throw ValidationException::withMessages([
+                    'proposed' => ['Filter ajuan tidak valid.'],
+                ]);
+            }
+            $query->where('is_proposed', $proposed === 'ajuan' ? 1 : 0);
         }
 
         // Server-side sorting. Column names are whitelisted here and never

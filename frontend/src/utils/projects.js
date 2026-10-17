@@ -57,6 +57,16 @@ export const PROJECT_PELUNASAN_FILTER = [
   { value: 'belum_lunas', label: 'Belum Lunas' },
 ];
 
+// Opsi FILTER Ajuan pada halaman daftar Projek, mengikuti kolom existing
+// tb_project.is_proposed (tinyint(1) NOT NULL DEFAULT 0):
+//   ajuan       = is_proposed = 1 (sudah diajukan).
+//   tidak_ajuan = is_proposed = 0 (belum diajukan).
+// Kosong = Semua Ajuan (tanpa filter).
+export const PROJECT_PROPOSED_FILTER = [
+  { value: 'ajuan', label: 'Ajuan' },
+  { value: 'tidak_ajuan', label: 'Tidak Ajuan' },
+];
+
 export const PROJECT_PELUNASAN_VARIANT = {
   belum_bayar: 'default',
   dp: 'warning',

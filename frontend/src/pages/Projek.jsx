@@ -20,6 +20,7 @@ import SpkPreview from '../components/SpkPreview';
 import {
   PROJECT_PELUNASAN_FILTER,
   PROJECT_PELUNASAN_VARIANT,
+  PROJECT_PROPOSED_FILTER,
   PROJECT_STATUS,
   PROJECT_STATUS_VARIANT,
   PROJECT_URGENCY,
@@ -51,7 +52,11 @@ export default function Projek() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [pelunasanFilter, setPelunasanFilter] = useState('');
   const [urgencyFilter, setUrgencyFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  // Default filter saat halaman dibuka: hanya projek Running & Tidak Ajuan.
+  // Nilai harus sama dengan value opsi dropdown dan parameter API
+  // (status -> 'running', proposed -> 'tidak_ajuan'/is_proposed = 0).
+  const [statusFilter, setStatusFilter] = useState('running');
+  const [proposedFilter, setProposedFilter] = useState('tidak_ajuan');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -96,6 +101,7 @@ export default function Projek() {
         pelunasan: pelunasanFilter,
         urgency: urgencyFilter,
         status: statusFilter,
+        proposed: proposedFilter,
         page: currentPage,
         perPage: ITEMS_PER_PAGE,
         ...sortParams,
@@ -115,7 +121,7 @@ export default function Projek() {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearchQuery, pelunasanFilter, urgencyFilter, statusFilter, currentPage, sort]);
+  }, [debouncedSearchQuery, pelunasanFilter, urgencyFilter, statusFilter, proposedFilter, currentPage, sort]);
 
   useEffect(() => {
     fetchProjectsData();
@@ -132,7 +138,8 @@ export default function Projek() {
     setDebouncedSearchQuery('');
     setPelunasanFilter('');
     setUrgencyFilter('');
-    setStatusFilter('');
+    setStatusFilter('running');
+    setProposedFilter('tidak_ajuan');
     setCurrentPage(1);
     resetSort();
     setTimeout(() => searchInputRef.current?.focus(), 0);
@@ -343,6 +350,19 @@ export default function Projek() {
             >
               <option value="">Semua Status</option>
               {PROJECT_STATUS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="Filter ajuan"
+              value={proposedFilter}
+              onChange={handleFilterChange(setProposedFilter)}
+              className="w-full sm:w-44 rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option value="">Semua Ajuan</option>
+              {PROJECT_PROPOSED_FILTER.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
