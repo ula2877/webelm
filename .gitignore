@@ -1,5 +1,4 @@
-# Laravel sessions & cache
-backend/storage/framework/sessions/
+# Laravel cache
 backend/.phpunit.result.cache
 
 # Dependencies
@@ -16,3 +15,6 @@ Thumbs.db
 *.swp
 .idea/
 .vscode/
+
+# Local artifacts
+backend.zip

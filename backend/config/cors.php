@@ -19,9 +19,10 @@ return [
 
     'allowed_methods' => ['*'],
 
-    // Development frontend origins (Vite). Kept explicit rather than '*'
-    // because supports_credentials is enabled below.
+    // Production frontend + development frontend origins (Vite). Kept explicit
+    // rather than '*' because supports_credentials is enabled below.
     'allowed_origins' => [
+        'https://new-project.elmechtechnology.com',
         'http://localhost:5173',
         'http://127.0.0.1:5173',
         'http://localhost:5174',

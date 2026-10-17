@@ -194,8 +194,14 @@ return [
     |
     | Supported: "lax", "strict", "none", null
     |
+    | Defaults to "lax", which is correct when the SPA and the API share the
+    | same registrable domain (e.g. app.example.com <-> api.example.com) - they
+    | are same-site, so the session cookie is still sent on XHR. Set
+    | SESSION_SAME_SITE=none (must be combined with SESSION_SECURE_COOKIE=true)
+    | only when the frontend is served from a genuinely different site.
+    |
     */
 
-    'same_site' => 'lax',
+    'same_site' => env('SESSION_SAME_SITE', 'lax'),
 
 ];
